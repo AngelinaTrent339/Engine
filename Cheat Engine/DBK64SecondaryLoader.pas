@@ -21,7 +21,7 @@ resourcestring
   rsSeemsLikeDbvmIsntLoadedAfterAll = 'seems like dbvm isn''t loaded after all';
   rsSuccessTheDriverHasBeenLoaded = 'Success. The driver has been loaded thanks to dbvm';
   rsTheDriverFailedToInitialize = 'The driver failed to initialize';
-  rsModuleLoaderDailedToMDbk64sysToMemoryap = 'ModuleLoader failed to map dbk64.sys to memory';
+  rsModuleLoaderFailedToMapKernelDriver = 'ModuleLoader failed to map wekernel64.sys to memory';
   rsErrorWhileTryingToLoadTheDriverAtPart = 'Error while trying to load the driver at part ';
 
 const IRP_MJ_CREATE                   =$00;
@@ -104,7 +104,7 @@ begin
     part:=2;
     //ShowMessage('Part 2');
 
-    ml:=TModuleLoader.create(CheatEngineDir+'dbk64.sys');
+    ml:=TModuleLoader.create(CheatEngineDir+'wekernel64.sys');
 
     part:=3;
    // ShowMessage('Part 3');
@@ -125,7 +125,7 @@ begin
       part:=7;
     end
     else
-      showmessage(rsModuleLoaderDailedToMDbk64sysToMemoryap);
+      showmessage(rsModuleLoaderFailedToMapKernelDriver);
 
     part:=8;
   except

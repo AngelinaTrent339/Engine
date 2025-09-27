@@ -3191,14 +3191,14 @@ begin
         if not fileexists(dataloc) then
         begin
 
-          servicename:='CEDRIVER73';
+          servicename:='WEKernel64';
           ultimapservicename:='ULTIMAP2';
-          processeventname:='DBKProcList60';
-          threadeventname:='DBKThreadList60';
+          processeventname:='WEProcList60';
+          threadeventname:='WEThreadList60';
 
           if iswow64 then
           begin
-            sysfile:='dbk64.sys';
+            sysfile:='wekernel64.sys';
             ultimapsysfile:='ultimap2-64.sys';
           end
           else

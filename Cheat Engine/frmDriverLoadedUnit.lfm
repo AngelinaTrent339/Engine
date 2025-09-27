@@ -18,7 +18,7 @@ object frmDriverLoaded: TfrmDriverLoaded
     Height = 55
     Top = 0
     Width = 364
-    Caption = 'DBK64 LOADED'
+    Caption = 'Kernel Driver Loaded'
     Font.CharSet = ANSI_CHARSET
     Font.Height = -48
     Font.Name = 'Arial'

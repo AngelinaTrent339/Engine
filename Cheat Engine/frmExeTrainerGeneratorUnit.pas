@@ -372,7 +372,7 @@ begin
               if cbKernelDebug.checked then
               begin
                 addfile(cheatenginedir+'dbk32.sys');
-                addfile(cheatenginedir+'dbk64.sys');
+                addfile(cheatenginedir+'wekernel64.sys');
                 addfile(cheatenginedir+'cheatengine-i386.exe.sig');
               end;
 
@@ -396,7 +396,7 @@ begin
 
               if cbKernelDebug.checked then
               begin
-                addfile(cheatenginedir+'dbk64.sys');
+                addfile(cheatenginedir+'wekernel64.sys');
                 addfile(cheatenginedir+'cheatengine-x86_64.exe.sig');
               end;
 
