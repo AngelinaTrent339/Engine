@@ -31,13 +31,13 @@ In the above state, move to the EXECUTABLE folder at the command prompt and exec
 # Usage
 ### Linux
  - Start ceserver with administrator privileges.`sudo ./ceserver`
- - Start Cheat Engine via Wine, or if you are running Linux on a virtual machine, start Cheat Engine on the host OS.
+ - Start Work Engine via Wine, or if you are running Linux on a virtual machine, start Work Engine on the host OS.
  - Select the Network tab of the process list. In the Host field, enter localhost (via Wine) or Guest OS ip (on a virtual machine).
 
 ### Android
  - Execute `su` and start ceserver with root privileges.
  - Run the adb command on the PC.`adb forward tcp:52736 tcp:52736`
- - Start Cheat Engine.
+ - Start Work Engine.
  - Select the Network tab of the process list. In the Host field, enter localhost (Android Emulator) or Android device ip address (real Android device).
  
 ### Execution options

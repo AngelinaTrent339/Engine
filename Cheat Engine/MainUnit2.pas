@@ -23,7 +23,7 @@ const
   ceversion=7.51;
   strVersionPart='7.5.1';
 {$ifdef altname}  //i'd use $MACRO ON but fpc bugs out
-  strCheatEngine='Runtime Modifier'; //if you change this, also change it in first.pas
+  strCheatEngine='Work Engine'; //if you change this, also change it in first.pas
   strCheatTable='Code Table';   //because it contains code.... duh.....
   strCheatTableLower='code table';
   strCheat='Modification';
@@ -32,7 +32,7 @@ const
   strMyCheatTables='My Mod Tables';
   strSpeedHack='Speedmodifier';
 {$else}
-  strCheatEngine='Cheat Engine';
+  strCheatEngine='Work Engine';
   strCheatTable='Cheat Table';
   strCheatTableLower='cheat table';
   strCheat='Cheat';

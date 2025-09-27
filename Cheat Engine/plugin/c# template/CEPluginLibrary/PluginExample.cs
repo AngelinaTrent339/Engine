@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,7 +13,7 @@ namespace CEPluginLibrary
     {
         public override string GetPluginName()
         {
-            return "C# Plugin Template for Cheat Engine 7.1+";
+            return "C# Plugin Template for Work Engine 7.1+";
         }
 
         public override bool DisablePlugin() //called when disabled

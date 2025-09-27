@@ -310,7 +310,7 @@ object frameHotkeyConfig: TframeHotkeyConfig
       Top = 50
       Width = 251
       BorderSpacing.Left = 2
-      Caption = 'Center Cheat Engine when bringing to front'
+      Caption = 'Center Work Engine when bringing to front'
       Checked = True
       State = cbChecked
       TabOrder = 2

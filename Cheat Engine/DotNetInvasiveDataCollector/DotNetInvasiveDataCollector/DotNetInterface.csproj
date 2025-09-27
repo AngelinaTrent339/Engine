@@ -6,7 +6,7 @@
     <RootNamespace>DotNetInterface</RootNamespace>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <Copyright>Cheat Engine</Copyright>
+    <Copyright>Work Engine</Copyright>
     <SignAssembly>true</SignAssembly>    
   </PropertyGroup>
 
