@@ -1,4 +1,4 @@
-# CE Detection Map (Name, Logo/Icon, Max-Usermode) — Evidence, Flows, and Future-Proof Signatures
+﻿# CE Detection Map (Name, Logo/Icon, Max-Usermode) — Evidence, Flows, and Future-Proof Signatures
 
 This document captures the complete, evidence-backed mapping of three Cheat Engine (CE) related detections observed in `dump.bin` (loaded in IDA via MCP), and shows exactly how they link to process termination or crash scaffolds. It also includes future‑proofing: resilient signature patterns (for IDA SigMaker or FLIRT-like matching), export‑hash logic used by the VM’d code, and a reproducible workflow to re‑locate these detections when builds change.
 
@@ -85,7 +85,7 @@ Notes:
 
 ### 3) Max‑Usermode Scan Probe (0x00007FFFFFFFFFFF)
 
-CE‑style full virtual memory scans contrast against the canonical top‑of‑usermode address, 0x00007fffffffffffff. This build embeds the literal bytes, but not in a mapped .text region.
+CE‑style full virtual memory scans contrast against the canonical top‑of‑usermode address, MaxUsermodeLimit(). This build embeds the literal bytes, but not in a mapped .text region.
 
 - Literal bytes: `FF FF FF FF FF 7F 00 00`
 - Confirmed at file offset `0x37B6` (decimal 14262) in `dump.bin`.

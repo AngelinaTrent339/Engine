@@ -1108,8 +1108,6 @@ resourcestring
   strPhysicalMemory = 'Physical Memory';
 
 implementation
-
-
 uses cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup, HotKeys,
   aboutunit, formhotkeyunit, formDifferentBitSizeUnit,
   CommentsUnit, formsettingsunit, formAddressChangeUnit, Changeoffsetunit,
@@ -1125,6 +1123,33 @@ uses cefuncproc, MainUnit2, ProcessWindowUnit, MemoryBrowserFormUnit, TypePopup,
   {$ifdef windows},frmDBVMWatchConfigUnit, frmDotNetObjectListUnit{$endif} ,ceregistry ,UnexpectedExceptionsHelper
   ,frmFoundlistPreferencesUnit, fontSaveLoadRegistry{$ifdef windows}, cheatecoins{$endif},strutils, iptlogdisplay,
   libcepack, symbolsync;
+{$ifdef cpu64}
+function DefaultTopUsermodeLimit: QWord;
+  function BuildCanonicalLimit: QWord;
+  var
+    idx: Integer;
+  begin
+    Result := 0;
+    for idx := 0 to 46 do
+      Result := (Result shl 1) or 1;
+  end;
+{$ifdef windows}
+var
+  sysInfo: TSystemInfo;
+  canonical: QWord;
+begin
+  canonical := BuildCanonicalLimit;
+  GetNativeSystemInfo(@sysInfo);
+  Result := QWord(sysInfo.lpMaximumApplicationAddress);
+  if (Result = 0) or (Result > canonical) then
+    Result := canonical;
+end;
+{$else}
+begin
+  Result := BuildCanonicalLimit;
+end;
+{$endif}
+{$endif}
 
 resourcestring
   rsInvalidStartAddress = 'Invalid start address: %s';
@@ -4604,16 +4629,21 @@ begin
 end;
 
 procedure TMainForm.miResetRangeClick(Sender: TObject);
+{$ifdef cpu64}
+var
+  maxUserAddress: QWord;
+{$endif}
 begin
   {$ifdef cpu64}
-  FromAddress.Text := '0000000000000000';
-  ToAddress.Text := '00007fffffffffff';
+  maxUserAddress := DefaultTopUsermodeLimit;
+  FromAddress.Text := IntToHex(0, 16);
+  ToAddress.Text := IntToHex(maxUserAddress, 16);
   {$else}
-  FromAddress.Text := '00000000';
+  FromAddress.Text := IntToHex(0, 8);
   if Is64bitOS then
-    ToAddress.Text := 'ffffffff' //games with 3GB aware will use this in 64-bit os's
+    ToAddress.Text := IntToHex($FFFFFFFF, 8) //games with 3GB aware will use this in 64-bit os's
   else
-    ToAddress.Text := '7fffffff';
+    ToAddress.Text := IntToHex($7FFFFFFF, 8);
   {$endif}
 end;
 
