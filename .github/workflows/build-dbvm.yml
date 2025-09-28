@@ -1,0 +1,89 @@
+name: Build DBVM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - 'dbvm/**'
+      - '.github/workflows/build-dbvm.yml'
+
+permissions: read-all
+
+concurrency:
+  group: dbvm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --- NEW: prep job computes a lowercase owner once ---
+  prep:
+    runs-on: ubuntu-24.04
+    outputs:
+      owner_lc: ${{ steps.lc.outputs.owner_lc }}
+    steps:
+      - id: lc
+        shell: bash
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "owner_lc=${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+  build-dbvm:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    # Use the lowercase owner; add credentials so private GHCR pulls work.
+    container:
+      image: ghcr.io/${{ needs.prep.outputs.owner_lc }}/dbvm-build:jammy-gcc9-1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout (shallow)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prime ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-dbvm-${{ runner.os }}-gcc9-${{ github.ref_name }}-${{ hashFiles('dbvm/**/*') }}
+          restore-keys: |
+            ccache-dbvm-${{ runner.os }}-gcc9-
+
+      - name: Versions
+        run: |
+          gcc --version
+          g++ --version
+          yasm --version
+          nasm --version
+          make --version
+          ccache --version || true
+
+      - name: Build DBVM
+        env:
+          CC: gcc
+          CXX: g++
+          MAKEFLAGS: -j$(nproc)
+        run: |
+          cd dbvm
+          make clean
+          make install
+          ccache -s || true
+
+      - name: List build outputs
+        run: |
+          ls -la dbvm/
+          find dbvm -name "*.img" -o -name "*.bin" -o -name "*.rom" | head -20
+
+      - name: Upload DBVM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DBVM-${{ github.sha }}
+          path: |
+            dbvm/vmdisk.img
+            dbvm/vmdisk144.img
+            dbvm/**/*.bin
+          if-no-files-found: warn

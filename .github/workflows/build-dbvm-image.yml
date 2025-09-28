@@ -1,0 +1,51 @@
+name: Build DBVM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - 'dbvm/**'
+      - '.github/workflows/build-dbvm.yml'
+
+permissions: read-all
+
+concurrency:
+  group: dbvm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-dbvm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (shallow)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Make lowercase repo owner
+      - name: Lowercase owner
+        id: who
+        run: echo "owner_lc=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      - name: Set up container
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ghcr.io/${{ steps.who.outputs.owner_lc }}/dbvm-build:jammy-gcc9-1
+          options: -v ${{ github.workspace }}:/workspace
+          run: |
+            cd /workspace/dbvm
+            make clean
+            make install
+
+      - name: Upload DBVM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DBVM-${{ github.sha }}
+          path: |
+            dbvm/vmdisk.img
+            dbvm/vmdisk144.img
+            dbvm/**/*.bin
+          if-no-files-found: warn
