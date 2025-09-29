@@ -1360,10 +1360,34 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_CPUID:
     {
       nosendchar[getAPICID()]=0;
-      sendstringf("!CPUID! %6->%6\n", currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->nRIP);
-      currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
+      // Minimal CPUID handler for AMD: mask hypervisor presence and vendor leaves
+      UINT64 inleaf = vmregisters->rax;
+      UINT64 a=vmregisters->rax, b=0, c=vmregisters->rcx, d=0;
+      _cpuid(&a,&b,&c,&d);
 
-      while (1);
+      if (inleaf==1)
+      {
+        // Clear ECX[31] hypervisor-present bit
+        c &= ~(1ULL << 31);
+      }
+
+      if ((inleaf & 0xFFF00000ULL)==0x40000000ULL)
+      {
+        a=0; b=0; c=0; d=0;
+      }
+
+      vmregisters->rax=a;
+      vmregisters->rbx=b;
+      vmregisters->rcx=c;
+      vmregisters->rdx=d;
+
+      // Advance RIP past CPUID
+      if (AMD_hasNRIPS)
+        currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
+      else
+        currentcpuinfo->vmcb->RIP+=2; // cpuid is 2 bytes on AMD
+
+      currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       return 0;
     }
 

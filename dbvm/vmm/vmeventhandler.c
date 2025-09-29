@@ -1924,7 +1924,7 @@ int handleCPUID(VMRegisters *vmregisters)
 {
 //  sendstring("handling CPUID\n\r");
 
-  //UINT64 oldeax=vmregisters->rax;
+  UINT64 oldeax=vmregisters->rax;
   RFLAGS flags;
   flags.value=vmread(vm_guest_rflags);
 
@@ -1935,6 +1935,26 @@ int handleCPUID(VMRegisters *vmregisters)
 
 
   _cpuid(&(vmregisters->rax),&(vmregisters->rbx),&(vmregisters->rcx),&(vmregisters->rdx));
+
+  // Hide hypervisor presence and vendor leaves
+  if (oldeax==1)
+  {
+    // Clear ECX[31] (hypervisor present)
+    vmregisters->rcx &= ~(1ULL << 31);
+
+    // If OSXSAVE is enabled, reflect it if desired (keep current behavior commented out)
+    // if ((vmregisters->rcx & (1ULL<<26)) && (vmread(vm_guest_cr4) & CR4_OSXSAVE))
+    //   vmregisters->rcx |= (1ULL<<27);
+  }
+
+  // Zero out hypervisor CPUID leaves (0x40000000 - 0x4FFFFFFF)
+  if ((oldeax & 0xFFF00000ULL) == 0x40000000ULL)
+  {
+    vmregisters->rax = 0;
+    vmregisters->rbx = 0;
+    vmregisters->rcx = 0;
+    vmregisters->rdx = 0;
+  }
 
   /*
   if (oldeax==1)
