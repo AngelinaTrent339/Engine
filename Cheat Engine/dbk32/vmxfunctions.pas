@@ -1064,7 +1064,7 @@ begin
 
   vmcallinfo.structsize:=sizeof(vmcallinfo);
   vmcallinfo.level2pass:=vmx_password2;
-  vmcallinfo.command:=VMCALL_GETVERSION;
+  vmcallinfo.command:=VMCALL_GETVERSION_PRIVATE;
   try
     result:=vmcall(@vmcallinfo);
 

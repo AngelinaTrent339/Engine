@@ -665,7 +665,7 @@ void LaunchDBVM()
 
       vmcallinfo.structsize=sizeof(vmcallinfo);
       vmcallinfo.level2pass=0xfedcba98;
-      vmcallinfo.command=0; //VMCALL_GETVERSION
+      vmcallinfo.command=255; //VMCALL_GETVERSION_PRIVATE
 
       UINT64 dbvmversion=dovmcall(&vmcallinfo, 0x76543210);
       int r;

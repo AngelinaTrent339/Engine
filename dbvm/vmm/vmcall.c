@@ -931,53 +931,15 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
 
   switch (vmcall_instruction[2])
   {
-    case VMCALL_GETVERSION: //get version
+    case VMCALL_GETVERSION: //public getversion always returns 0 (no DBVM)
     {
-      //sendstring("Version request\n\r");
-      
-      // Get current CR3 to identify calling process
-      QWORD currentCR3 = isAMD ? currentcpuinfo->vmcb->CR3 : vmread(vm_guest_cr3);
-      
-      // Static array to track trusted processes (CR3 values)
-      static QWORD trustedCR3[32] = {0};
-      static int trustedCount = 0;
-      static QWORD lastTrustedCR3 = 0;
-      
-      // Check if this CR3 is already trusted
-      int isTrusted = 0;
-      for (int i = 0; i < trustedCount && i < 32; i++) {
-        if (trustedCR3[i] == currentCR3) {
-          isTrusted = 1;
-          break;
-        }
-      }
-      
-      // If not trusted but we have space, add it as trusted on first call
-      // This allows legitimate processes to establish trust
-      if (!isTrusted && trustedCount < 32) {
-        // Simple heuristic: if the caller used correct passwords and this is 
-        // the first time we see this CR3, assume it's legitimate
-        PVMCALL_BASIC vmcallinfo = (PVMCALL_BASIC)vmcall_instruction;
-        if (vmcallinfo->password2 == Password2 && 
-            vmregisters->rdx == Password1 && 
-            vmregisters->rcx == Password3) {
-          trustedCR3[trustedCount] = currentCR3;
-          trustedCount++;
-          isTrusted = 1;
-        }
-      }
-      
-      if (isTrusted) {
-        // Return expected response for trusted processes
-        vmregisters->rax = 0xce000000 + dbvmversion;
-        lastTrustedCR3 = currentCR3;
-      } else {
-        // Return pseudo-random values for untrusted processes 
-        // This makes it appear as random system noise rather than a consistent 0
-        // Use current CR3 and CPU cycle counter as entropy sources
-        QWORD entropy = currentCR3 ^ (QWORD)currentcpuinfo;
-        vmregisters->rax = (entropy & 0x7FFFFFFF) | 0x80000000; // Ensure high bit set to avoid 0xCE pattern
-      }
+      vmregisters->rax = 0; // probe sees DBVM as not loaded
+      break;
+    }
+
+    case VMCALL_GETVERSION_PRIVATE: //private getversion for trusted callers
+    {
+      vmregisters->rax = 0xce000000 + dbvmversion;
       break;
     }
 

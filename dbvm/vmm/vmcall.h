@@ -5,6 +5,8 @@
 #include "vmcallstructs.h"
 
 #define VMCALL_GETVERSION 0
+// Private, internal-only GETVERSION not known to external scanners
+#define VMCALL_GETVERSION_PRIVATE 255
 #define VMCALL_CHANGEPASSWORD 1
 #define VMCALL_READ_PHYSICAL_MEMORY 3
 #define VMCALL_WRITE_PHYSICAL_MEMORY 4
