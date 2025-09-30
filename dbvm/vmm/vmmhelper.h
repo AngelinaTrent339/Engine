@@ -415,6 +415,12 @@ typedef volatile struct tcpuinfo
   QWORD totaltsctaken; //must be offset 0x20
   QWORD lastTSCTouch;
   QWORD lowestTSC;
+  
+  // Performance counter MSR virtualization
+  QWORD guestAPERF;  // Virtual APERF value for guest
+  QWORD guestMPERF;  // Virtual MPERF value for guest
+  QWORD lastVMExitTSC; // TSC at last VM-exit for overhead tracking
+  
   DWORD active;
   DWORD apicid;
 
