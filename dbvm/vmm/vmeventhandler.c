@@ -1973,8 +1973,8 @@ int handleCPUID(VMRegisters *vmregisters)
     if (subleaf == 0)
     {
       // Check word 4 (ECX low 16 bits) for the signature
-      UINT16 word4 = (UINT16)(vmregisters->rcx & 0xFFFF);
-      UINT16 test_result = word4 ^ 0x66B5;
+      WORD word4 = (WORD)(vmregisters->rcx & 0xFFFF);
+      WORD test_result = word4 ^ 0x66B5;
       
       sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n", 
                   word4, test_result);
@@ -1987,8 +1987,8 @@ int handleCPUID(VMRegisters *vmregisters)
       }
       
       // Also check RBX for other potential signatures
-      UINT16 word2 = (UINT16)(vmregisters->rbx & 0xFFFF);
-      UINT16 word3 = (UINT16)((vmregisters->rbx >> 16) & 0xFFFF);
+      WORD word2 = (WORD)(vmregisters->rbx & 0xFFFF);
+      WORD word3 = (WORD)((vmregisters->rbx >> 16) & 0xFFFF);
       sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
     }
   }

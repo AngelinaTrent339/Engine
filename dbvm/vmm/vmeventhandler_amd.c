@@ -1517,8 +1517,8 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         
         if (insubleaf == 0)
         {
-          UINT16 word4 = (UINT16)(c & 0xFFFF);
-          UINT16 test_result = word4 ^ 0x66B5;
+          WORD word4 = (WORD)(c & 0xFFFF);
+          WORD test_result = word4 ^ 0x66B5;
           
           sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n",
                       word4, test_result);
@@ -1529,8 +1529,8 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             sendstring("  >>> PATCHED ECX to avoid Roblox detection!\n");
           }
           
-          UINT16 word2 = (UINT16)(b & 0xFFFF);
-          UINT16 word3 = (UINT16)((b >> 16) & 0xFFFF);
+          WORD word2 = (WORD)(b & 0xFFFF);
+          WORD word3 = (WORD)((b >> 16) & 0xFFFF);
           sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
         }
       }
