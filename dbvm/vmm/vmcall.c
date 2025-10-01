@@ -2309,7 +2309,9 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
 
 
     default:
-      vmregisters->rax = 0xcedead;
+      // Return 0 for unknown vmcalls instead of 0xCEDEAD
+      // Roblox checks if high byte == 0xCE to detect DBVM
+      vmregisters->rax = 0;
       break;
   }
 
@@ -2393,6 +2395,10 @@ int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   {
     int x;
     sendstringf("Invalid register password Given=%6 %6 should be %6 %6\n\r",vmregisters->rdx, vmregisters->rcx, Password1, Password3);
+    // Clear RAX to avoid detection (don't leave 0xCE in high byte)
+    vmregisters->rax = 0;
+    if (isAMD)
+      currentcpuinfo->vmcb->RAX = 0;
     x = raiseInvalidOpcodeException(currentcpuinfo);
     sendstringf("return = %d\n\r",x);
     return x;

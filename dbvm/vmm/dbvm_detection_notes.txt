@@ -1,39 +1,59 @@
-# DBVM Detection Notes
+# DBVM Detection Notes (Updated)
 
-## 1. TLS Callback Guard (`TlsCallback_0`, VA base+0x0D91290)
-- Executes during module load, before user code runs.
-- CPUID leaf `0x0D / ECX=0` (XSAVE) stored into stack (`xmm0`).
-- Constant `0xC6F458952D8466B5` -> `AX = 0x66B5`.
-- Sequence: `pextrw ecx, xmm0, 4` ? `xor eax, ecx` ? `cmp ax, 0x25`.
-- Match triggers `NtTerminateProcess(..., 0x0BADD00D)`; fail-path falls through.
-- Static patch options: modify `jnz`, mask XOR result, or spoof CPUID leaf.
+## Overall Flow
+1. **TLS callback (`TlsCallback_0`, VA base+0x0D91290)** runs immediately after the DLL loads. It performs the CPUID/XSAVE check described below.
+2. **Early initializer (`sub_7FFC54E42BA0`, VA base+0x0C72BA0)** executes next, regardless of TLS outcome. This routine owns the vmcall/vmmcall probes and the obfuscated control flow that eventually decides whether to continue initialization.
+3. If any probe indicates DBVM, `sub_7FFC54E42BA0` sets `dword_7FFC54401F80 = 2` and exits, which later causes the initialization chain to invoke the fail-fast (`int 0x29`) or otherwise abort.
 
-## 2. Primary Vmcall Version Probe (`sub_7FFC54E42BA0`)
-- Called early in DLL initialization.
-- Invokes `sub_7FFC54F24380` (vmcall wrapper).
-- After wrapper: `movzx eax, [rbp-1D]` ? `shl eax, 24` ? `cmp eax, 0xCE000000`.
-- Equality sets `dword_7FFC54401F80 = 2` via obfuscated path and aborts init.
-- Patch by forcing comparison to fail or sanitizing `[rbp-1D]` / vmcall return.
+## 1. TLS CPUID Guard
+- **Location:** `TlsCallback_0` at offset `0xD9166E` (VA `0x7ffc54f6166e`).
+- **Mechanism:**
+  - Executes `cpuid` with `EAX=0x0D`, `ECX=0` (XSAVE capabilities) ? result stored on stack (`xmm0`).
+  - Loads constant `0xC6F458952D8466B5` so `AX = 0x66B5`.
+  - Extracts the low XSAVE word (`pextrw ecx, xmm0, 4`), XORs it with `AX`, and compares against `0x25`.
+- **Failure Path:** If the XOR equals `0x25`, calls `NtTerminateProcess(..., 0x0BADD00D)` immediately.
+- **Bypass:** Patch `jnz`, manipulate the XOR result, or spoof CPUID leaf `0x0D` during process start.
 
-## 3. AMD/SVM Vmcall Path (`sub_7FFC54F24380` else-branch)
-- If config bit yields false, wrapper enters SVM branch:
-  - Hard-coded checks against `PEB` and `ProcessHeap` relocating to `0xCE81...`.
-  - Executes `vmmcall 0x90909090/0x76543210` and writes result back.
-  - Caller reuses byte at `[rbp-1D]` (same high-byte check) and fails if `0xCE`.
-- Must neutralize alongside Intel path: disable `vmmcall`, spoof result, or patch pointer tests.
+## 2. Primary `vmcall` Probe (Intel path)
+- **Wrapper:** `sub_7FFC54F24380` (vmcall dispatcher).
+- **Caller:** `sub_7FFC54E42BA0` after TLS completion.
+- **Flow:**
+  1. Wrapper sets up `RCX=0x90909090`, `RDX=0x76543210` and executes `vmcall` (Intel VMX instruction).
+  2. Return value (64-bit) is stored back into caller’s stack frame (`**(_QWORD **)a1 = *(_QWORD *)(a1 + 8)`). The byte at `[rbp-0x1D]` becomes the high byte of that value.
+  3. Caller performs `movzx eax, byte ptr [rbp-0x1D]` ? `shl eax, 24` ? `cmp eax, 0xCE000000`.
+  4. When the comparison matches, the routine writes `dword_7FFC54401F80 = 2`, enters the obfuscated failure branch, and aborts further initialization.
+- **Why this still fires even with a “version” hook:** DBVM’s `vmcall` handler returns a pseudo-version signature with the high byte set to `0xCE`. The loader never relies on reading the actual version; it only inspects that marker before any of the runtime calls your private handler would service.
+- **Mitigation Options:**
+  - Patch the compare/jump so the failure block is never executed.
+  - Sanitize `[rbp-0x1D]` (e.g., force it to zero) before the compare.
+  - Hook DBVM’s `vmcall 0x90909090/0x76543210` so it returns a safe high byte.
 
-## 4. Fail-Fast / `int 0x29` Paths
-- Several `_report_securityfailure` clones call `int 0x29` with different bugcheck IDs:
-  - `sub_7FFC54FA05C0`, `sub_7FFC54FA050C`, etc.
-  - Triggered from `sub_7FFC54FA38D0` when internal state indicates tamper (e.g., TLS alloc fail).
-  - Not yet tied to DBVM but run on initialization failure. Reference addresses stored in `unk_7FFC5435D0E8` dispatch array.
+## 3. Secondary `vmmcall` Probe (AMD/SVM path)
+- **Same wrapper (`sub_7FFC54F24380`)** contains an alternate branch taken when an obfuscated flag resolves differently. This is the “twin” to the Intel path: both branches perform the same signature test but use different instructions (`vmcall` vs. `vmmcall`).
+- **Execution Steps:**
+  1. The wrapper evaluates a bit derived from the per-run byte tables (`__ROL1__(~*((_BYTE *)&unk_7FFC54403AB5 + index) + 16), 6) & 1`). If the flag is **zero**, it takes the AMD/SVM path.
+  2. Performs two environment checks:
+     - `NtCurrentTeb()->ProcessEnvironmentBlock == 0xCE81AB615188D413`.
+     - `NtCurrentPeb()->ProcessHeap == 0xCE81AB61407870C9`.
+     Any match immediately jumps to the abort routine.
+  3. Issues `vmmcall` with the same parameters (`0x90909090/0x76543210`), stores the 64-bit result, and ultimately reuses `[rbp-0x1D]` ? `cmp eax, 0xCE000000` just like the Intel branch.
+- **Why it matters:** Even if you spoof the Intel `vmcall` return, the SVM branch triggers next and sees DBVM’s `vmmcall` version byte (also `0xCE`). If either branch hits, the loader sets `dword_7FFC54401F80 = 2` and the process exits early.
+- **Mitigation:** Patch or spoof both branches:
+  - Disable `vmmcall` or force the branch flag to keep the wrapper in the Intel path.
+  - Patch the pointer comparisons or sanitize the byte before the compare.
+  - Hook DBVM’s SVM `vmmcall` to return a safe value.
 
-## 5. Randomized Byte Tables
-- Functions like `sub_7FFC54F74CC0`, `sub_7FFC54D3D1E0`, `sub_7FFC54D7C4A0`, etc. initialize obfuscated byte tables using `rdtsc` seeds.
-- No explicit hypervisor instructions discovered; likely entropy for anti-emulation.
-- Arrays referenced when decoding hashed constants (e.g., config bit gating vmcall path).
+## 4. Fail-Fast (`int 0x29`) Blocks
+- **Functions:** `sub_7FFC54FA050C`, `sub_7FFC54FA05C0`, `sub_7FFC54FA38D0`, etc., all ultimately issue `int 0x29` when initialization state is inconsistent.
+- **Context:** These are referenced through dispatch arrays at `unk_7FFC5435CF68` / `unk_7FFC5435D0E8`. When `dword_7FFC54401F80` is non-zero (set by the vmcall/vmmcall probes), later stages use these fail-fast handlers instead of continuing.
+- **Observation:** Fail-fast uses `0xC0000417`/`0xC0000409` bugcheck codes—no direct DBVM instruction, but a direct consequence of the earlier detection branches.
 
-## Pending / Unverified
-- Additional early exit checks may consume `dword_7FFC54401F80` and other globals (e.g. `qword_7FFC54402BD9`).
-- Need runtime trace to map when `_report_securityfailure` triggers (likely indirect detection).
-- No direct `cpuid` usage beyond TLS wrapper found in early call list, but further scanning suggested.
+## 5. Byte-Table Initializers (“Obfuscated twins”)
+- Multiple routines (`sub_7FFC54F74CC0`, `sub_7FFC54D3D1E0`, `sub_7FFC54D7C4A0`, etc.) populate large byte arrays using `rdtsc`-seeded linear congruential generators.
+- These tables feed the wrapper flags, compute indices, and generate hashed constants (the `__ROL1__(~...)` expressions). Because the data is randomized each launch, the comparison constants (`0xCE81AB…`) are not stored plainly; they are re-derived through these tables.
+- When we refer to the Intel/AMD branches as “twins,” it’s because both consume the same randomized tables and apply the same high-byte check, differing only in the actual instruction used (`vmcall` vs. `vmmcall`).
+
+## Pending Items
+- Additional callers of `sub_7FFC54F24380` should be inspected to confirm no third signature path exists.
+- The fail-fast dispatch (`unk_7FFC5435CF68`, `unk_7FFC5435D0E8`) contains many other function pointers; some of them may perform extra telemetry or environment checks once the primary flag is set.
+- If new branches appear after future updates, re-run this analysis focusing on new entries in those dispatcher arrays.
