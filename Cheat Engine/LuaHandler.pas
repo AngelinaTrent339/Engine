@@ -8582,7 +8582,7 @@ begin
 
     configure_vmx(key1, key2, key3);
 
-    lua_pushboolean(L, dbvm_version>=$ce000000);
+    lua_pushboolean(L, dbvm_version>=$db000000); //changed from $ce to $db to avoid Roblox detection
     result:=1;
   end
   else

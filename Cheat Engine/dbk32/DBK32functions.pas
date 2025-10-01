@@ -1345,7 +1345,7 @@ var ao: array [0..511] of byte;
     bufpointer2: pointer;
     towrite: dword;
 begin
-  if vmx_loaded and (dbvm_version>=$ce00000a) then
+  if vmx_loaded and (dbvm_version>=$db00000a) then //changed from $ce to $db to avoid Roblox detection
   begin
     NumberOfBytesWritten:=dbvm_write_physical_memory(qword(lpBaseAddress), lpBuffer, nSize);
     exit(NumberOfBytesWritten=nSize);
@@ -1411,7 +1411,7 @@ var ao: array [0..600] of byte;
     bufpointer:ptrUint;
 begin
   //processhandle is just there for compatibility in case I want to quickly wrap it over read/writeprocessmemory
-  if vmx_loaded and (dbvm_version>=$ce00000a) then
+  if vmx_loaded and (dbvm_version>=$db00000a) then //changed from $ce to $db to avoid Roblox detection
   begin
     numberofbytesread:=dbvm_read_physical_memory(qword(lpBaseAddress), lpBuffer, nSize);
     exit(numberofbytesread=nSize);
@@ -1688,7 +1688,7 @@ begin
   end;
 
   //still here
-  if (BaseAddress>=qword($8000000000000000)) and (vmx_enabled and (dbvm_version>=$ce000005)) then //if dbvm is running and it's a kernel accesses use dbvm
+  if (BaseAddress>=qword($8000000000000000)) and (vmx_enabled and (dbvm_version>=$db000005)) then //if dbvm is running and it's a kernel accesses use dbvm (changed from $ce to $db to avoid Roblox detection)
     result:=dbvm_copyMemory(pointer(BaseAddress), lpBuffer, nSize)
   else
     result:=windows.writeProcessMemory(hProcess,pointer(ptrUint(BaseAddress)),lpBuffer,nSize,NumberOfByteswritten);
@@ -2750,7 +2750,7 @@ begin
   end
   else
   begin
-    if dbvm_version>=$ce000006 then
+    if dbvm_version>=$db000006 then //changed from $ce to $db to avoid Roblox detection
     begin
       try
         result:=dbvm_readMSR(msr); //will raise a GPF if it doesn't exist
@@ -3445,7 +3445,7 @@ begin
 
         if hdevice=INVALID_HANDLE_VALUE then
         begin
-          if dbvm_version>$ce000000 then
+          if dbvm_version>$db000000 then //changed from $ce to $db to avoid Roblox detection
           begin
             if MessageDlg(rsTheDriverCouldntBeOpened, mtconfirmation, [mbyes, mbno],0)=mryes then
             begin

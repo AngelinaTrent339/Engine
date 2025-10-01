@@ -939,7 +939,8 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
 
     case VMCALL_GETVERSION_PRIVATE: //private getversion for trusted callers
     {
-      vmregisters->rax = 0xce000000 + dbvmversion;
+      // Changed from 0xCE000000 to 0x00000000 to avoid Roblox high-byte detection
+      vmregisters->rax = dbvmversion;
       break;
     }
 
@@ -968,7 +969,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     }
 
     case 2: //toggle memory cloak
-      vmregisters->rax = 0xcedead; //not implemented
+      vmregisters->rax = 0; //not implemented (don't use 0xCEDEAD - Roblox checks high byte)
       break;
 
     case VMCALL_READ_PHYSICAL_MEMORY: //read physical memory
@@ -990,7 +991,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       {
         //intercept these msr's as well
 
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1017,7 +1018,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
 
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1064,7 +1065,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1090,7 +1091,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     case 8: //choose os
     {
       sendstring("Not yet implemented\n\r");
-      vmregisters->rax = 0xcedead;
+      vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
       break;
     }
 
@@ -1133,7 +1134,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
       ULONG cs=vmcall_instruction[3];
@@ -1158,7 +1159,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1178,7 +1179,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1196,7 +1197,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1216,7 +1217,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1244,7 +1245,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       UINT64 newcr3=*(UINT64 *)&vmcall_instruction[3];
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1277,7 +1278,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
       vmregisters->rax = raisePrivilege(currentcpuinfo);
@@ -1393,7 +1394,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1419,7 +1420,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1432,7 +1433,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1445,7 +1446,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1458,7 +1459,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1476,7 +1477,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1491,7 +1492,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1504,7 +1505,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1517,7 +1518,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
     {
       if (isAMD)
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
         break;
       }
 
@@ -1589,7 +1590,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       else
       {
         sendstringf("hasEPTsupport==0\n");
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
       }
       break;
     }
@@ -1603,7 +1604,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       }
       else
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
       }
       break;
     }
@@ -1617,7 +1618,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       }
       else
       {
-        vmregisters->rax = 0xcedead;
+        vmregisters->rax = 0; // Don't use 0xCEDEAD - Roblox detection
       }
       break;
     }
@@ -1640,7 +1641,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_activate(((PVMCALL_CLOAK_ACTIVATE_PARAM)vmcall_instruction)->physicalAddress,((PVMCALL_CLOAK_ACTIVATE_PARAM)vmcall_instruction)->mode);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1662,7 +1663,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
 
       }
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1675,7 +1676,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
                                                   ((PVMCALL_CLOAK_WHITELIST)vmcall_instruction)->CR3,
                                                   ((PVMCALL_CLOAK_WHITELIST)vmcall_instruction)->RIP);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1687,7 +1688,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
                                                        ((PVMCALL_CLOAK_WHITELIST)vmcall_instruction)->CR3,
                                                        ((PVMCALL_CLOAK_WHITELIST)vmcall_instruction)->RIP);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1698,7 +1699,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
         vmregisters->rax=ept_cloak_startaccesswatch(((PVMCALL_CLOAKEX_ACTIVATE_PARAM)vmcall_instruction)->physicalAddress,
                                                     ((PVMCALL_CLOAKEX_ACTIVATE_PARAM)vmcall_instruction)->maxcount);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1709,7 +1710,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport)
         vmregisters->rax=ept_cloak_fetchaccesswatchresults(((PVMCALL_CLOAKEX_ACTIVATE_PARAM)vmcall_instruction)->physicalAddress);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1719,7 +1720,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport)
         vmregisters->rax=ept_cloak_stopaccesswatch(((PVMCALL_CLOAKEX_ACTIVATE_PARAM)vmcall_instruction)->physicalAddress);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }*/
@@ -1730,7 +1731,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_deactivate(((PVMCALL_CLOAK_DEACTIVATE_PARAM)vmcall_instruction)->physicalAddress);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1740,7 +1741,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         return ept_cloak_readOriginal(currentcpuinfo, vmregisters, ((PVMCALL_CLOAK_READ_PARAM)vmcall_instruction)->physicalAddress, ((PVMCALL_CLOAK_READ_PARAM)vmcall_instruction)->destination);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1750,7 +1751,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         return ept_cloak_writeOriginal(currentcpuinfo, vmregisters, ((PVMCALL_CLOAK_WRITE_PARAM)vmcall_instruction)->physicalAddress, ((PVMCALL_CLOAK_WRITE_PARAM)vmcall_instruction)->source);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1760,7 +1761,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_changeregonbp(((PVMCALL_CLOAK_CHANGEREG_PARAM)vmcall_instruction)->physicalAddress, &((PVMCALL_CLOAK_CHANGEREG_PARAM)vmcall_instruction)->changereginfo);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1770,7 +1771,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_removechangeregonbp(((PVMCALL_CLOAK_REMOVECHANGEREG_PARAM)vmcall_instruction)->physicalAddress);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
       break;
     }
 
@@ -1784,7 +1785,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
         vmregisters->rax=ept_cloak_traceonbp(p->physicalAddress, p->flags, p->tracecount);
       }
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1802,7 +1803,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
         sendstringf("after p->count=%d p->maxcount=%d", p->count, p->maxcount);
       }
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
       break;
     }
 
@@ -1813,7 +1814,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_traceonbp_stoptrace();
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 
       break;
     }
@@ -1824,7 +1825,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       if (hasEPTsupport || hasNPsupport)
         vmregisters->rax=ept_cloak_traceonbp_remove(((PVMCALL_CLOAK_TRACEONBP_REMOVE_PARAM)vmcall_instruction)->force);
       else
-        vmregisters->rax=0xcedead;
+        vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
       break;
     }
 
@@ -2301,7 +2302,7 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       spinlocktimeout=p->timeout;
       vmregisters->rax=0;
 #else
-      vmregisters->rax=0xCEDEAD;
+      vmregisters->rax=0; // Don't use 0xCEDEAD - Roblox detection
 #endif
       break;
     }

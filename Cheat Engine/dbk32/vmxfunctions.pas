@@ -3407,7 +3407,7 @@ var cc: dword;
     x: TInput;
 begin
   {$IFDEF windows}
-  if (dbvm_version>$ce000000) then //tell the driver it can use vmcall instructions
+  if (dbvm_version>$db000000) then //tell the driver it can use vmcall instructions (changed from $ce to $db to avoid Roblox detection)
   begin
     OutputDebugString('vmx_enabled=TRUE');
 
