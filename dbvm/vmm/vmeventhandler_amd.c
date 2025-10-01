@@ -1507,6 +1507,34 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         }
       }
 
+      // Fix XSAVE enumeration (CPUID leaf 0x0D) to avoid Roblox detection
+      // Roblox stores EAX,EBX,ECX,EDX in 128-bit buffer, extracts word 4 (ECX low16),
+      // XORs with 0x66B5 and checks if result == 0x25 (meaning ECX low16 == 0x6690)
+      if (inleaf == 0x0D)
+      {
+        sendstringf("CPUID 0x0D subleaf %d: EAX=%8 EBX=%8 ECX=%8 EDX=%8\n",
+                    (UINT32)insubleaf, (UINT32)a, (UINT32)b, (UINT32)c, (UINT32)d);
+        
+        if (insubleaf == 0)
+        {
+          UINT16 word4 = (UINT16)(c & 0xFFFF);
+          UINT16 test_result = word4 ^ 0x66B5;
+          
+          sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n",
+                      word4, test_result);
+          
+          if (test_result == 0x25)
+          {
+            c = (c & 0xFFFFFFFFFFFF0000ULL) | 0x6691;
+            sendstring("  >>> PATCHED ECX to avoid Roblox detection!\n");
+          }
+          
+          UINT16 word2 = (UINT16)(b & 0xFFFF);
+          UINT16 word3 = (UINT16)((b >> 16) & 0xFFFF);
+          sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
+        }
+      }
+
       vmregisters->rax=a;
       vmregisters->rbx=b;
       vmregisters->rcx=c;

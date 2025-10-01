@@ -1,0 +1,39 @@
+# DBVM Detection Notes
+
+## 1. TLS Callback Guard (`TlsCallback_0`, VA base+0x0D91290)
+- Executes during module load, before user code runs.
+- CPUID leaf `0x0D / ECX=0` (XSAVE) stored into stack (`xmm0`).
+- Constant `0xC6F458952D8466B5` -> `AX = 0x66B5`.
+- Sequence: `pextrw ecx, xmm0, 4` ? `xor eax, ecx` ? `cmp ax, 0x25`.
+- Match triggers `NtTerminateProcess(..., 0x0BADD00D)`; fail-path falls through.
+- Static patch options: modify `jnz`, mask XOR result, or spoof CPUID leaf.
+
+## 2. Primary Vmcall Version Probe (`sub_7FFC54E42BA0`)
+- Called early in DLL initialization.
+- Invokes `sub_7FFC54F24380` (vmcall wrapper).
+- After wrapper: `movzx eax, [rbp-1D]` ? `shl eax, 24` ? `cmp eax, 0xCE000000`.
+- Equality sets `dword_7FFC54401F80 = 2` via obfuscated path and aborts init.
+- Patch by forcing comparison to fail or sanitizing `[rbp-1D]` / vmcall return.
+
+## 3. AMD/SVM Vmcall Path (`sub_7FFC54F24380` else-branch)
+- If config bit yields false, wrapper enters SVM branch:
+  - Hard-coded checks against `PEB` and `ProcessHeap` relocating to `0xCE81...`.
+  - Executes `vmmcall 0x90909090/0x76543210` and writes result back.
+  - Caller reuses byte at `[rbp-1D]` (same high-byte check) and fails if `0xCE`.
+- Must neutralize alongside Intel path: disable `vmmcall`, spoof result, or patch pointer tests.
+
+## 4. Fail-Fast / `int 0x29` Paths
+- Several `_report_securityfailure` clones call `int 0x29` with different bugcheck IDs:
+  - `sub_7FFC54FA05C0`, `sub_7FFC54FA050C`, etc.
+  - Triggered from `sub_7FFC54FA38D0` when internal state indicates tamper (e.g., TLS alloc fail).
+  - Not yet tied to DBVM but run on initialization failure. Reference addresses stored in `unk_7FFC5435D0E8` dispatch array.
+
+## 5. Randomized Byte Tables
+- Functions like `sub_7FFC54F74CC0`, `sub_7FFC54D3D1E0`, `sub_7FFC54D7C4A0`, etc. initialize obfuscated byte tables using `rdtsc` seeds.
+- No explicit hypervisor instructions discovered; likely entropy for anti-emulation.
+- Arrays referenced when decoding hashed constants (e.g., config bit gating vmcall path).
+
+## Pending / Unverified
+- Additional early exit checks may consume `dword_7FFC54401F80` and other globals (e.g. `qword_7FFC54402BD9`).
+- Need runtime trace to map when `_report_securityfailure` triggers (likely indirect detection).
+- No direct `cpuid` usage beyond TLS wrapper found in early call list, but further scanning suggested.

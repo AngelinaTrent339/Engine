@@ -1925,6 +1925,7 @@ int handleCPUID(VMRegisters *vmregisters)
 //  sendstring("handling CPUID\n\r");
 
   UINT64 oldeax=vmregisters->rax;
+  UINT64 oldecx=vmregisters->rcx;  // Save subleaf for leaf 0x0D check
   RFLAGS flags;
   flags.value=vmread(vm_guest_rflags);
 
@@ -1954,6 +1955,42 @@ int handleCPUID(VMRegisters *vmregisters)
     vmregisters->rbx = 0;
     vmregisters->rcx = 0;
     vmregisters->rdx = 0;
+  }
+
+  // Fix XSAVE enumeration (CPUID leaf 0x0D) to avoid Roblox detection
+  // Roblox stores EAX,EBX,ECX,EDX in 128-bit buffer, extracts word 4 (ECX low16),
+  // XORs with 0x66B5 and checks if result == 0x25 (meaning ECX low16 == 0x6690)
+  if (oldeax == 0x0D)
+  {
+    UINT32 subleaf = (UINT32)(oldecx & 0xFFFFFFFF);
+    
+    // Log to see what we're actually returning
+    nosendchar[getAPICID()]=0;
+    sendstringf("CPUID 0x0D subleaf %d: EAX=%8 EBX=%8 ECX=%8 EDX=%8\n", 
+                subleaf, (UINT32)vmregisters->rax, (UINT32)vmregisters->rbx,
+                (UINT32)vmregisters->rcx, (UINT32)vmregisters->rdx);
+    
+    if (subleaf == 0)
+    {
+      // Check word 4 (ECX low 16 bits) for the signature
+      UINT16 word4 = (UINT16)(vmregisters->rcx & 0xFFFF);
+      UINT16 test_result = word4 ^ 0x66B5;
+      
+      sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n", 
+                  word4, test_result);
+      
+      if (test_result == 0x25)
+      {
+        // Detected! Change ECX low 16 bits to avoid detection
+        vmregisters->rcx = (vmregisters->rcx & 0xFFFFFFFFFFFF0000ULL) | 0x6691;
+        sendstring("  >>> PATCHED ECX to avoid Roblox detection!\n");
+      }
+      
+      // Also check RBX for other potential signatures
+      UINT16 word2 = (UINT16)(vmregisters->rbx & 0xFFFF);
+      UINT16 word3 = (UINT16)((vmregisters->rbx >> 16) & 0xFFFF);
+      sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
+    }
   }
 
   /*
