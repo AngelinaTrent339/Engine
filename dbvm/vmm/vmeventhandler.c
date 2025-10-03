@@ -37,7 +37,7 @@ int CR3ValuePos;
 volatile QWORD globalTSC;
 volatile QWORD lowestTSC=0;
 
-int adjustTimestampCounters=1;
+int adjustTimestampCounters=0;  // DISABLED - Roblox detection bypass
 int adjustTimestampCounterTimeout=2000;
 
 int useSpeedhack=0;
@@ -1929,10 +1929,11 @@ int handleCPUID(VMRegisters *vmregisters)
   RFLAGS flags;
   flags.value=vmread(vm_guest_rflags);
 
-  if (flags.TF==1)
-  {
-    vmwrite(vm_pending_debug_exceptions,0x4000);
-  }
+  // DISABLED - Roblox detection bypass (TF handling)
+  // if (flags.TF==1)
+  // {
+  //   vmwrite(vm_pending_debug_exceptions,0x4000);
+  // }
 
 
   _cpuid(&(vmregisters->rax),&(vmregisters->rbx),&(vmregisters->rcx),&(vmregisters->rdx));
@@ -3473,8 +3474,9 @@ int handleInterruptProtectedMode(pcpuinfo currentcpuinfo, VMRegisters *vmregiste
 
     if (currentcpuinfo->Ultimap.Active)
       ultimap_handleDB(currentcpuinfo);
-    else
-      vmwrite(vm_guest_IA32_DEBUGCTL, vmread(vm_guest_IA32_DEBUGCTL) & ~1); //disable the LBR bit ( if it isn't already disabled)
+    // DISABLED - Roblox detection bypass (LBR bit preservation)
+    // else
+    //   vmwrite(vm_guest_IA32_DEBUGCTL, vmread(vm_guest_IA32_DEBUGCTL) & ~1); //disable the LBR bit ( if it isn't already disabled)
 
 
     //set GD to 0
@@ -4139,8 +4141,9 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     RFLAGS flags;
     flags.value=vmread(vm_guest_rflags);
 
-    if (flags.TF==1)
-      vmwrite(vm_pending_debug_exceptions,0x4000);
+    // DISABLED - Roblox detection bypass (TF handling in IO)
+    // if (flags.TF==1)
+    //   vmwrite(vm_pending_debug_exceptions,0x4000);
   }
 
   return 0;

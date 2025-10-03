@@ -1482,13 +1482,15 @@ void vmx_enableTSCHook(pcpuinfo currentcpuinfo)
 {
   if (isAMD)
   {
-    currentcpuinfo->vmcb->InterceptRDTSC=1;
-    currentcpuinfo->vmcb->InterceptRDTSCP=1;
+    // DISABLED - Roblox detects RDTSC VM-exit latency
+    currentcpuinfo->vmcb->InterceptRDTSC=0;
+    currentcpuinfo->vmcb->InterceptRDTSCP=0;
   }
   else
   {
-    if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
-      vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) | RDTSC_EXITING);
+    // DISABLED - Roblox detects RDTSC VM-exit latency
+    // if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
+    //   vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) | RDTSC_EXITING);
 
 
 
