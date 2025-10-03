@@ -1283,6 +1283,19 @@ db 0xcc
 db 0xcc
 
 ;------------------------------------;
+;UINT64 xgetbv(ULONG xcr);
+;------------------------------------;
+global _xgetbv
+_xgetbv:
+push rcx
+mov ecx,edi
+xgetbv
+shl rdx,32
+or rax,rdx
+pop rcx
+ret
+
+;------------------------------------;
 ;void xsetbv(ULONG xcr, UINT64 value);
 ;------------------------------------;
 global _xsetbv

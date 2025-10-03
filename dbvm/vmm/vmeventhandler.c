@@ -3904,15 +3904,57 @@ VMSTATUS handleInterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSA
 #pragma GCC optimize ("O0")
 int handleXSETBV(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 {
+  // BUG FIX: Exit 55 triggers for BOTH XGETBV and XSETBV!
+  // Need to check which one actually executed
+  
+  // Read the actual instruction bytes to determine XGETBV vs XSETBV
+  int error;
+  UINT64 pagefaultaddress;
+  UINT64 rip = vmread(vm_guest_rip);
+  unsigned char *instruction = (unsigned char *)mapVMmemory(currentcpuinfo, rip, 3, &error, &pagefaultaddress);
+  
+  if (instruction && instruction[0] == 0x0F && instruction[1] == 0x01)
+  {
+    if (instruction[2] == 0xD0) {
+      // XGETBV - Read XCR
+      sendstring("XGETBV - reading XCR\n\r");
+      
+      // Read XCR register (ECX specifies which one, usually 0 for XCR0)
+      unsigned long long xcr_value = _xgetbv(vmregisters->rcx);
+      
+      // Return in EDX:EAX
+      vmregisters->rax = xcr_value & 0xFFFFFFFF;
+      vmregisters->rdx = xcr_value >> 32;
+      
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      
+      vmwrite(vm_guest_rip, rip + vmread(vm_exit_instructionlength));
+      return 0;
+    }
+    else if (instruction[2] == 0xD1) {
+      // XSETBV - Write XCR (original code)
+      sendstring("XSETBV - writing XCR\n\r");
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      
+      // Fall through to original XSETBV handler below
+    }
+    else {
+      sendstringf("Unknown 0F 01 variant: %x\n\r", instruction[2]);
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      return raiseInvalidOpcodeException(currentcpuinfo);
+    }
+  }
+  
+  // Original XSETBV handling
   unsigned long long value=((unsigned long long)vmregisters->rdx << 32)+vmregisters->rax;
   int success=0;
 
-  sendstring("handleXSETBV\n\r");
-
   currentcpuinfo->LastInterrupt=0;
-  currentcpuinfo->OnInterrupt.RIP=(QWORD)((volatile void *)(&&InterruptFired)); //set interrupt location
+  currentcpuinfo->OnInterrupt.RIP=(QWORD)((volatile void *)(&&InterruptFired));
   currentcpuinfo->OnInterrupt.RSP=getRSP();
-
 
   if (vmread(vm_guest_cr4) & CR4_OSXSAVE)
   {
@@ -3926,9 +3968,7 @@ int handleXSETBV(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   }
 
   sendstring("Calling _xsetbv\n");
-
   _xsetbv(vmregisters->rcx, value);
-
   sendstring("Returned without exception\n");
   success=1;
 
@@ -3943,9 +3983,6 @@ InterruptFired:
 
     if (currentcpuinfo->LastInterrupt==6)
       raiseInvalidOpcodeException(currentcpuinfo);
-
-
-
   }
   else
   {
