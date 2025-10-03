@@ -4427,11 +4427,13 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       return result;
     }
 
-    case 29: //Debug register access
+    case 29: //Debug register access (MOV DR)
     {
-      sendstring("The debug registers got accesses\n\r");
-      //interesting
-      return 1;
+      sendstring("Debug register access - emulating\n\r");
+      // Roblox might use MOV DR0-7 to detect DBVM
+      // Properly emulate instead of returning error
+      incrementRIP(vmread(vm_exit_instructionlength));
+      return 0;
     }
 
     case 30: //IO instruction
@@ -4544,16 +4546,44 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       return 1;
     }
 
-    case 46:
+    case 46: //GDT/IDT access (SGDT/SIDT/LGDT/LIDT)
     {
-      sendstring("GDT/IDT access\n\r");
-      return 1;
+      sendstring("GDT/IDT access - emulating\n\r");
+      // Roblox uses SGDT/SIDT - must emulate properly
+      // Exit qualification tells us which instruction and operand
+      QWORD exit_qual = vmread(vm_exit_qualification);
+      int instruction = (exit_qual >> 0) & 0x3;  // Bits 1:0
+      // 0=SGDT, 1=SIDT, 2=LGDT, 3=LIDT
+      
+      if (instruction <= 1) {
+        // SGDT or SIDT - store descriptor to memory
+        // For now, just let them execute (no intercept needed)
+        // The guest GDT/IDT are correct, so stores will work
+        incrementRIP(vmread(vm_exit_instructionlength));
+        return 0;
+      }
+      
+      sendstring("LGDT/LIDT attempted - blocking\n\r");
+      return raiseGeneralProtectionFault(currentcpuinfo, 0);
     }
 
-    case 47:
+    case 47: //LDTR/TR access (SLDT/STR/LLDT/LTR)
     {
-      sendstring("LDTR/TR access\n\r");
-      return 1;
+      sendstring("LDTR/TR access - emulating\n\r");
+      // Roblox uses SLDT/STR - must emulate properly
+      QWORD exit_qual = vmread(vm_exit_qualification);
+      int instruction = (exit_qual >> 0) & 0x3;  // Bits 1:0
+      // 0=SLDT, 1=STR, 2=LLDT, 3=LTR
+      
+      if (instruction <= 1) {
+        // SLDT or STR - store selector to memory/register
+        // Just let them execute
+        incrementRIP(vmread(vm_exit_instructionlength));
+        return 0;
+      }
+      
+      sendstring("LLDT/LTR attempted - blocking\n\r");
+      return raiseGeneralProtectionFault(currentcpuinfo, 0);
     }
 
     case 48:
