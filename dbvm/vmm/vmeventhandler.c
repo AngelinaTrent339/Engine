@@ -4601,7 +4601,7 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       }
       
       sendstring("LGDT/LIDT attempted - blocking\n\r");
-      return raiseGeneralProtectionFault(currentcpuinfo, 0);
+      return raiseGeneralProtectionFault(0);
     }
 
     case 47: //LDTR/TR access (SLDT/STR/LLDT/LTR)
@@ -4620,7 +4620,7 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       }
       
       sendstring("LLDT/LTR attempted - blocking\n\r");
-      return raiseGeneralProtectionFault(currentcpuinfo, 0);
+      return raiseGeneralProtectionFault(0);
     }
 
     case 48:
