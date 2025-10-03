@@ -1355,7 +1355,6 @@ BOOL ept_handleFrozenThread(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, F
   int result=TRUE;
   RFLAGS v;
   v.value=BrokenThreadList[id].state.basic.FLAGS;
-  QWORD RIP=isAMD?currentcpuinfo->vmcb->RIP:vmread(vm_guest_rip);
 
   nosendchar[getAPICID()]=0;
   //sendstringf("ept_handleFrozenThread: RIP=%6\n",RIP);
@@ -1483,7 +1482,6 @@ BOOL ept_handleSoftwareBreakpoint(pcpuinfo currentcpuinfo, VMRegisters *vmregist
     csEnter(&BrokenThreadListCS);
     if (BrokenThreadList && BrokenThreadListPos)
     {
-      int shouldHaveBeenHandled=0;
       //sendstringf("Checking the broken threadlist");
       for (i=0; i<BrokenThreadListPos; i++)
       {
@@ -1513,8 +1511,6 @@ BOOL ept_handleSoftwareBreakpoint(pcpuinfo currentcpuinfo, VMRegisters *vmregist
           //check if it's matches this thread
           if ((cr3==BrokenThreadList[i].state.basic.CR3) && ((rip==BrokenThreadList[i].KernelModeLoop) || (rip==BrokenThreadList[i].UserModeLoop)))
           {
-            shouldHaveBeenHandled=1;
-
             if ((QWORD)rax!=(QWORD)i) continue; //rax should match the brokenthreadlist id
 
             result=ept_handleFrozenThread(currentcpuinfo, vmregisters, fxsave, i);
@@ -2478,7 +2474,6 @@ BOOL ept_handleWatchEvent(pcpuinfo currentcpuinfo, VMRegisters *registers, PFXSA
 
         if (BrokenThreadListPos>=BrokenThreadListSize) //list full
         {
-          void *oldaddress=(void *)BrokenThreadList;
           BrokenThreadList=(BrokenThreadEntry *)realloc(BrokenThreadList, BrokenThreadListSize+sizeof(BrokenThreadEntry)*32); //add 32
           BrokenThreadListSize+=32;
         }
@@ -3436,6 +3431,7 @@ int ept_watch_activate(QWORD PhysicalAddress, int Size, int Type, DWORD Options,
       while (c->WaitingTillDone==0) _pause();
     }
 #endif
+    (void)currentcpuinfo;
 
 
     if (isAMD)
@@ -3610,6 +3606,7 @@ int ept_watch_deactivate(int ID)
         while (c->WaitingTillDone==0) _pause();
       }
 #endif
+      (void)currentcpuinfo;
 
 
 

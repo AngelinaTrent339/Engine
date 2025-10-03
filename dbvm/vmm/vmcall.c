@@ -2205,8 +2205,8 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
         int watchid;
         int status;
         PageEventExtended entry;
-      }  __attribute__((__packed__)) *PGETBROKENTHREADENTRYFULL_PARAM;
-      PGETBROKENTHREADENTRYFULL_PARAM p=(PGETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
+      }  __attribute__((__packed__)) *PVMGETBROKENTHREADENTRYFULL_PARAM;
+      PVMGETBROKENTHREADENTRYFULL_PARAM p=(PVMGETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
 
       vmregisters->rax=ept_getBrokenThreadEntryFull(p->id, &p->watchid,  &p->status, &p->entry);
       break;
@@ -2219,8 +2219,8 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
         VMCALL_BASIC vmcall;
         int id;
         PageEventExtended entry;
-      }  __attribute__((__packed__)) *PGETBROKENTHREADENTRYFULL_PARAM;
-      PGETBROKENTHREADENTRYFULL_PARAM p=(PGETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
+      }  __attribute__((__packed__)) *PVMSETBROKENTHREADENTRYFULL_PARAM;
+      PVMSETBROKENTHREADENTRYFULL_PARAM p=(PVMSETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
 
       vmregisters->rax=ept_setBrokenThreadEntryFull(p->id, &p->entry);
       break;
@@ -2430,7 +2430,7 @@ int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
   if ((vmcall_instruction[0]<12) || (vmcall_instruction[1]!=Password2))
   {
-    int i, maxnr;
+    int i=0, maxnr;
     sendstringf("Invalid password2 or structuresize. Given=%8 should be %8\n\r",vmcall_instruction[1], Password2);
 
     sendstringf("0: %8", vmcall_instruction[0]);
@@ -2537,4 +2537,3 @@ int handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
   return result;
 }
-
