@@ -49,6 +49,7 @@ extern int useserial;
 #define WORD unsigned short int
 #define ULONG unsigned int
 #define DWORD unsigned int
+#define UINT16 unsigned short int
 #define UINT32 unsigned int
 #define UINT64 unsigned long long
 #define QWORD UINT64
