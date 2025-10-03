@@ -2192,7 +2192,31 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       }  __attribute__((__packed__)) *PGETBROKENTHREADENTRYSHORT_PARAM;
       PGETBROKENTHREADENTRYSHORT_PARAM p=(PGETBROKENTHREADENTRYSHORT_PARAM)vmcall_instruction;
 
-      vmregisters->rax=ept_getBrokenThreadEntryShort(p->id, &p->Watchid, &p->Status, &p->CR3, &p->FSBASE, &p->GSBASE, &p->GSBASE_KERNEL, &p->CS, &p->RIP, &p->Heartbeat);
+      // Avoid taking address of packed members: use aligned locals
+      int _watchid, _status;
+      DWORD _cs;
+      QWORD _rip, _cr3, _fsbase, _gsbase, _gsbase_kernel, _heartbeat;
+      vmregisters->rax = ept_getBrokenThreadEntryShort(p->id,
+                                                       &_watchid,
+                                                       &_status,
+                                                       &_cr3,
+                                                       &_fsbase,
+                                                       &_gsbase,
+                                                       &_gsbase_kernel,
+                                                       &_cs,
+                                                       &_rip,
+                                                       &_heartbeat);
+
+      // Write results back to the packed buffer
+      p->Watchid = _watchid;
+      p->Status = _status;
+      p->CR3 = _cr3;
+      p->FSBASE = _fsbase;
+      p->GSBASE = _gsbase;
+      p->GSBASE_KERNEL = _gsbase_kernel;
+      p->CS = _cs;
+      p->RIP = _rip;
+      p->Heartbeat = _heartbeat;
       break;
     }
 
@@ -2208,7 +2232,13 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       }  __attribute__((__packed__)) *PVMGETBROKENTHREADENTRYFULL_PARAM;
       PVMGETBROKENTHREADENTRYFULL_PARAM p=(PVMGETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
 
-      vmregisters->rax=ept_getBrokenThreadEntryFull(p->id, &p->watchid,  &p->status, &p->entry);
+      // Use aligned locals instead of taking address of packed members
+      int _watchid, _status;
+      PageEventExtended _entry;
+      vmregisters->rax = ept_getBrokenThreadEntryFull(p->id, &_watchid, &_status, &_entry);
+      p->watchid = _watchid;
+      p->status = _status;
+      p->entry = _entry;
       break;
     }
 
@@ -2222,7 +2252,9 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
       }  __attribute__((__packed__)) *PVMSETBROKENTHREADENTRYFULL_PARAM;
       PVMSETBROKENTHREADENTRYFULL_PARAM p=(PVMSETBROKENTHREADENTRYFULL_PARAM)vmcall_instruction;
 
-      vmregisters->rax=ept_setBrokenThreadEntryFull(p->id, &p->entry);
+      // Copy to an aligned local before passing the pointer
+      PageEventExtended _entry = p->entry;
+      vmregisters->rax = ept_setBrokenThreadEntryFull(p->id, &_entry);
       break;
     }
 
