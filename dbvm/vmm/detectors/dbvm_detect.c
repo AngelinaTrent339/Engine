@@ -170,10 +170,19 @@ static hv_call3_t build_vm_ud_stub(BOOL amd_vmmcall)
   return build_vm_stub(amd_vmmcall);
 }
 
-static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
+typedef struct timing_stats_s {
+  uint64_t mean;
+  uint64_t vmin;
+  uint64_t vmax;
+  uint64_t p50;
+  uint64_t p90;
+  uint64_t p99;
+} timing_stats_t;
+
+static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
 {
   hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
-  if (!fn) return 0;
+  if (!fn) { if (out) memset(out, 0, sizeof(*out)); return; }
 
   // Intentionally wrong passwords (so DBVM injects #UD). On bare metal, this is also #UD.
   const unsigned iters = 256; // more samples for stability
@@ -195,30 +204,27 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
     if (dt > vmax) vmax = dt;
     if (sc<256) samples[sc++]=dt;
   }
-  // record distribution in global info via probe context if available
-  if (g_probe_ctx.active && g_probe_ctx.capture) {
-    if (!amd_vmmcall) {
-      g_probe_ctx.capture->vmcall_ud_min = vmin;
-      g_probe_ctx.capture->vmcall_ud_max = vmax;
-      // percentiles
-      // simple insertion sort for small array
-      for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
-      g_probe_ctx.capture->vmcall_p50 = samples[sc*50/100];
-      g_probe_ctx.capture->vmcall_p90 = samples[sc*90/100];
-      g_probe_ctx.capture->vmcall_p99 = samples[sc*99/100];
-    }
+  // summarize
+  if (out) {
+    // simple insertion sort for small array
+    for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
+    out->mean = ok ? (total / ok) : 0;
+    out->vmin = vmin; out->vmax = vmax;
+    out->p50 = samples[sc*50/100];
+    out->p90 = samples[sc*90/100];
+    out->p99 = samples[sc*99/100];
   }
-  return ok ? (total / ok) : 0;
 }
 
-static uint64_t measure_ud_path_cycles_ud2(void)
+static void measure_ud_path_cycles_ud2(timing_stats_t* out)
 {
   ud2_t fn = build_ud2_stub();
-  if (!fn) return 0;
-  const unsigned iters = 64;
+  if (!fn) { if (out) memset(out, 0, sizeof(*out)); return; }
+  // Match VMCALL sample count to reduce variance
+  const unsigned iters = 256;
   uint64_t total=0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
-  uint64_t samples[64]; unsigned sc=0;
+  uint64_t samples[256]; unsigned sc=0;
   for (unsigned i=0;i<iters;i++) {
     unsigned long long t0 = rdtsc64();
     __try {
@@ -231,17 +237,16 @@ static uint64_t measure_ud_path_cycles_ud2(void)
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
-    if (sc<64) samples[sc++]=dt;
+    if (sc<256) samples[sc++]=dt;
   }
-  if (g_probe_ctx.active && g_probe_ctx.capture) {
-    g_probe_ctx.capture->ud2_ud_min = vmin;
-    g_probe_ctx.capture->ud2_ud_max = vmax;
-    for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
-    g_probe_ctx.capture->ud2_p50 = samples[sc*50/100];
-    g_probe_ctx.capture->ud2_p90 = samples[sc*90/100];
-    g_probe_ctx.capture->ud2_p99 = samples[sc*99/100];
+  if (out) {
+    for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
+    out->mean = ok ? (total / ok) : 0;
+    out->vmin = vmin; out->vmax = vmax;
+    out->p50 = samples[sc*50/100];
+    out->p90 = samples[sc*90/100];
+    out->p99 = samples[sc*99/100];
   }
-  return ok ? (total / ok) : 0;
 }
 
 typedef struct {
@@ -503,19 +508,44 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   int prev_prio = GetThreadPriority(th);
   SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
 
-  g_probe_ctx.active = 1; g_probe_ctx.capture = info; // enable distribution capture
+  g_probe_ctx.active = 0; // distribution now reported via stats structs below
+  g_probe_ctx.capture = NULL;
+  timing_stats_t vm_vmcall_stats = {0}, vm_vmmcall_stats = {0}, ud2_stats = {0};
   uint64_t vm_ud_vmcall = 0, vm_ud_vmmcall = 0;
   if (!no_vm) {
-    vm_ud_vmcall = measure_ud_path_cycles_vmcall(FALSE); // Intel path
-    vm_ud_vmmcall = measure_ud_path_cycles_vmcall(TRUE);  // AMD path
+    measure_ud_path_cycles_vmcall(FALSE, &vm_vmcall_stats); // Intel path
+    measure_ud_path_cycles_vmcall(TRUE,  &vm_vmmcall_stats);  // AMD path
+    vm_ud_vmcall = vm_vmcall_stats.mean;
+    vm_ud_vmmcall = vm_vmmcall_stats.mean;
   }
   info->vm_ud_vmcall_cycles = vm_ud_vmcall;
   info->vm_ud_vmmcall_cycles = vm_ud_vmmcall;
 
   // Use the slower of the two as the signal carrier
-  info->vmcall_ud_cycles = (vm_ud_vmcall > vm_ud_vmmcall) ? vm_ud_vmcall : vm_ud_vmmcall;
-  info->ud2_ud_cycles = no_vm ? 0 : measure_ud_path_cycles_ud2();
-  g_probe_ctx.active = 0; g_probe_ctx.capture = NULL;
+  BOOL use_amd_path = (vm_ud_vmmcall >= vm_ud_vmcall);
+  info->vmcall_ud_cycles = use_amd_path ? vm_ud_vmmcall : vm_ud_vmcall;
+  // fill distribution for the chosen path
+  if (use_amd_path) {
+    info->vmcall_ud_min = vm_vmmcall_stats.vmin;
+    info->vmcall_ud_max = vm_vmmcall_stats.vmax;
+    info->vmcall_p50    = vm_vmmcall_stats.p50;
+    info->vmcall_p90    = vm_vmmcall_stats.p90;
+    info->vmcall_p99    = vm_vmmcall_stats.p99;
+  } else {
+    info->vmcall_ud_min = vm_vmcall_stats.vmin;
+    info->vmcall_ud_max = vm_vmcall_stats.vmax;
+    info->vmcall_p50    = vm_vmcall_stats.p50;
+    info->vmcall_p90    = vm_vmcall_stats.p90;
+    info->vmcall_p99    = vm_vmcall_stats.p99;
+  }
+
+  measure_ud_path_cycles_ud2(&ud2_stats);
+  info->ud2_ud_cycles = ud2_stats.mean;
+  info->ud2_ud_min    = ud2_stats.vmin;
+  info->ud2_ud_max    = ud2_stats.vmax;
+  info->ud2_p50       = ud2_stats.p50;
+  info->ud2_p90       = ud2_stats.p90;
+  info->ud2_p99       = ud2_stats.p99;
 
   // restore
   if (prev_aff) SetThreadAffinityMask(th, prev_aff);
@@ -551,7 +581,12 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   }
 
   // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF)
-  if (!no_vm) run_tf_order_probe(FALSE, info); // VMCALL
+  // Disabled by default as it does not currently affect classification and may vary by OS.
+  // Enable by setting DBVM_TF_PROBE=1 in the environment.
+  {
+    char tfen[8]; DWORD tfen_dw = GetEnvironmentVariableA("DBVM_TF_PROBE", tfen, sizeof(tfen));
+    if (!no_vm && tfen_dw>0 && tfen[0]=='1') run_tf_order_probe(FALSE, info); // VMCALL
+  }
 
   // Syscall path timing via ntdll
   measure_syscall_path(info);
@@ -565,17 +600,37 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     return info->result;
   }
 
-  // - If vmcall-UD avg cycles exceed ud2-UD cycles by threshold_pct or more,
-  //   strong indication that a ring -1 handler dispatched VMCALL and injected #UD
-  //   while still hiding the hypervisor-present bit.
-  if (info->vmcall_ud_cycles && info->ud2_ud_cycles &&
-      (info->vmcall_ud_cycles * 100ULL) >= (info->ud2_ud_cycles * (100ULL + (unsigned long long)threshold_pct))) {
-    info->result = DBVM_DETECT_SUSPECT_DBVM;
-    snprintf(info->reason, sizeof(info->reason),
-             "VMCALL#UD mean %llu vs UD2 %llu (>= %d%% over)",
-             (unsigned long long)info->vmcall_ud_cycles,
-             (unsigned long long)info->ud2_ud_cycles, threshold_pct);
-    return info->result;
+  // - Percentile-based side-channel: require both p50 and p90 to exceed threshold
+  if (info->vmcall_ud_cycles && info->ud2_ud_cycles) {
+    unsigned long long t50_ok = (info->vmcall_p50 * 100ULL) >= (info->ud2_p50 * (100ULL + (unsigned long long)threshold_pct));
+    unsigned long long t90_ok = (info->vmcall_p90 * 100ULL) >= (info->ud2_p90 * (100ULL + (unsigned long long)threshold_pct));
+    if (t50_ok && t90_ok) {
+      info->result = DBVM_DETECT_SUSPECT_DBVM;
+      snprintf(info->reason, sizeof(info->reason),
+               "VMCALL#UD p50 %llu vs UD2 %llu; p90 %llu vs %llu (>= %d%%)",
+               (unsigned long long)info->vmcall_p50,
+               (unsigned long long)info->ud2_p50,
+               (unsigned long long)info->vmcall_p90,
+               (unsigned long long)info->ud2_p90,
+               threshold_pct);
+      // Stronger confirm if mean ratio is very high (default >= 2x); env override DBVM_CONFIRM_RATIO_X100
+      int confirm_ratio_x100 = 190;
+      char crbuf[32]; DWORD m = GetEnvironmentVariableA("DBVM_CONFIRM_RATIO_X100", crbuf, sizeof(crbuf));
+      if (m>0 && m<sizeof(crbuf)) {
+        int c = atoi(crbuf); if (c>=120 && c<=500) confirm_ratio_x100 = c;
+      }
+      unsigned long long mean_ratio_x100 = info->ud2_ud_cycles ? (info->vmcall_ud_cycles * 100ULL) / info->ud2_ud_cycles : 0ULL;
+      if (mean_ratio_x100 >= (unsigned long long)confirm_ratio_x100) {
+        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+        snprintf(info->reason, sizeof(info->reason),
+                 "VMCALL#UD mean %llu vs UD2 %llu (ratio=%llux) >= %d%%",
+                 (unsigned long long)info->vmcall_ud_cycles,
+                 (unsigned long long)info->ud2_ud_cycles,
+                 (unsigned long long)mean_ratio_x100,
+                 confirm_ratio_x100);
+      }
+      return info->result;
+    }
   }
 
   // - Heuristic: Roblox-targeted patch evidence on AMD builds changed ECX low16 from 0x6690 -> 0x6691.
