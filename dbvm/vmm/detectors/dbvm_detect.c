@@ -13,6 +13,7 @@ struct probe_ctx_s {
   int    active;
   dbvm_detect_info_t* capture;
   int    max_records;
+  uint64_t* rip_out; // when non-NULL, store RIP advance into this field on #UD
 };
 extern struct probe_ctx_s g_probe_ctx;
 
@@ -391,8 +392,7 @@ static LONG WINAPI vmcall_veh(EXCEPTION_POINTERS* ep)
   // For #UD on targeted instruction, record RIP advance if any
   if (code == EXCEPTION_ILLEGAL_INSTRUCTION && g_probe_ctx.capture) {
     uint64_t adv = (uint64_t)((unsigned char*)rip - (unsigned char*)g_probe_ctx.target_insn);
-    if (g_probe_ctx.capture->used_vmmcall) g_probe_ctx.capture->vmmcall_rip_advance = adv;
-    else g_probe_ctx.capture->vmcall_rip_advance = adv;
+    if (g_probe_ctx.rip_out) *g_probe_ctx.rip_out = adv;
   }
 
   // Don’t alter context here; just record and let normal SEH unwind
@@ -438,19 +438,18 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
 // Prefixed TF-first probe for password-free confirm
 static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_detect_info_t* out)
 {
-  unsigned char code[48]; size_t i=0;
-  // pushfq; or qword [rsp],0x100; popfq
-  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
+  unsigned char code[64]; size_t i=0;
   // mov rax, rcx; mov rcx, r8
   code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
+  // pushfq; or qword [rsp],0x100; popfq
+  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
+  // prefix and vm*call
   unsigned char* insn = &code[i];
-  // prefix
   code[i++] = prefix;
-  // vmcall / vmmcall
   code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1);
   // ret
   code[i++]=0xC3;
-  void* mem = VirtualAlloc(NULL, 64, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  void* mem = VirtualAlloc(NULL, 128, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
   if (!mem) return 0;
   memcpy(mem, code, i);
   hv_call3_t fn = (hv_call3_t)mem;
@@ -459,10 +458,12 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
   g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 4;
   g_probe_ctx.capture     = out; g_probe_ctx.active = 1; g_probe_ctx.max_records = 4;
   out->tf_path_used_vmmcall = amd_vmmcall?1:0;
+  // Record RIP advance into prefixed fields
+  if (amd_vmmcall) g_probe_ctx.rip_out = &out->pref_vmmcall_rip_advance; else g_probe_ctx.rip_out = &out->pref_vmcall_rip_advance;
   static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
   __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
-  g_probe_ctx.active = 0;
+  g_probe_ctx.active = 0; g_probe_ctx.rip_out = NULL;
   DWORD ok = (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
   return ok ? 1 : 0;
 }
@@ -472,23 +473,16 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
 
 static hv_call3_t build_vm_stub_with_tf(BOOL amd_vmmcall)
 {
-  // Emit tiny code: pushfq; or qword [rsp],0x100; popfq; mov rax,rcx; mov rcx,r8; vm*call; ret
-  unsigned char code[32]; size_t i=0;
-  // pushfq
-  code[i++]=0x9C;
-  // or qword [rsp],0x100
-  code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; // or qword ptr [rsp], imm32
+  // Emit tiny code: mov rax,rcx; mov rcx,r8; pushfq; or [rsp],0x100; popfq; vm*call; ret
+  unsigned char code[48]; size_t i=0;
+  code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; // mov rax,rcx
+  code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1; // mov rcx,r8
+  code[i++]=0x9C; // pushfq
+  code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; // or qword [rsp],imm32
   code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; // 0x100
-  // popfq
-  code[i++]=0x9D;
-  // mov rax, rcx
-  code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8;
-  // mov rcx, r8
-  code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
-  // vmcall/vmmcall
-  code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1);
-  // ret
-  code[i++]=0xC3;
+  code[i++]=0x9D; // popfq
+  code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1); // vm*call
+  code[i++]=0xC3; // ret
   void* mem = VirtualAlloc(NULL, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
   if (!mem) return NULL;
   memcpy(mem, code, i);
@@ -772,19 +766,51 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   }
 
   // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF) — always run, password-free
+  int sig_tf_first_plain = 0;
   if (!no_vm) {
-    // Try a few times to avoid scheduler noise
-    if (tf_first_confirm(TRUE, info, 6, 1)) {
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMMCALL");
-      return info->result;
-    }
+    if (tf_first_confirm(TRUE, info, 6, 1)) sig_tf_first_plain = 1;
     info->tf_exc_count = 0;
-    if (tf_first_confirm(FALSE, info, 6, 1)) {
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMCALL");
-      return info->result;
+    if (!sig_tf_first_plain && tf_first_confirm(FALSE, info, 6, 1)) sig_tf_first_plain = 1;
+  }
+
+  // Prefixed VM*CALL TF-first (66, F3, REX.W)
+  int sig_tf_first_pref = 0;
+  if (!no_vm) {
+    unsigned char prefs[3] = { 0x66, 0xF3, 0x48 };
+    for (int vmm=0; vmm<2 && !sig_tf_first_pref; vmm++) {
+      for (int i=0;i<3 && !sig_tf_first_pref;i++) {
+        info->tf_exc_count = 0;
+        if (probe_prefixed_tf_first(vmm?TRUE:FALSE, prefs[i], info)) sig_tf_first_pref = 1;
+      }
     }
+  }
+
+  // SGDT/SIDT guest-style (multi-sample)
+  int sig_desc = sgdt_sidt_gueststyle_confirm();
+
+  // Exception fingerprint: simple consistency check (first is SINGLE_STEP with TF set; second, if present, is ILLEGAL_INSTRUCTION)
+  int sig_fingerprint = 0;
+  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+    if (info->tf_exc_eflags[0] & 0x100) {
+      if (info->tf_exc_count<2 || info->tf_exc_codes[1]==EXCEPTION_ILLEGAL_INSTRUCTION)
+        sig_fingerprint = 1;
+    }
+  }
+
+  // Majority vote (2-of-3) among: TF-first (plain), TF-first (prefixed), SGDT/SIDT. Fingerprint strengthens TF signals.
+  int votes = 0;
+  votes += sig_tf_first_plain ? 1 : 0;
+  votes += sig_tf_first_pref ? 1 : 0;
+  votes += sig_desc ? 1 : 0;
+  if (votes >= 2) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "Confirm (2/3): TF%s TFpref%s DESC%s%s",
+             sig_tf_first_plain?"+":"-",
+             sig_tf_first_pref?"+":"-",
+             sig_desc?"+":"-",
+             sig_fingerprint?" +fingerprint":"");
+    return info->result;
   }
 
   // Syscall path timing via ntdll

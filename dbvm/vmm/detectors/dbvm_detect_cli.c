@@ -44,6 +44,8 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("gdtr_base=0x%016llX\n", (unsigned long long)info->gdtr_base);
   printf("vmcall_rip_advance=%llu\n", (unsigned long long)info->vmcall_rip_advance);
   printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
+  printf("pref_vmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmcall_rip_advance);
+  printf("pref_vmmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmmcall_rip_advance);
   if (info->tf_exc_count) {
     printf("tf_exc_count=%u\n", info->tf_exc_count);
     for (uint32_t i=0;i<info->tf_exc_count;i++) {

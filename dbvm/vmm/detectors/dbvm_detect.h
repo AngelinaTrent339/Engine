@@ -45,6 +45,9 @@ typedef struct {
   uint64_t gdtr_base;
   uint64_t vmcall_rip_advance;     // bytes RIP advanced after #UD (intel path)
   uint64_t vmmcall_rip_advance;    // bytes RIP advanced after #UD (amd path)
+  // Prefixed variants (e.g., 66/F3/REX.W + VM*CALL) RIP advance after #UD
+  uint64_t pref_vmcall_rip_advance;
+  uint64_t pref_vmmcall_rip_advance;
   // TF/#DB vs #UD sequencing
   uint32_t tf_exc_count;           // number of exceptions captured (max 4)
   uint32_t tf_exc_codes[4];        // ordered exception codes
