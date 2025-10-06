@@ -101,6 +101,9 @@ static hv_call3_t build_vm_stub(BOOL amd_vmmcall)
   return (hv_call3_t)mem;
 }
 
+// Build a stub with optional prefixes before the VM instruction. Returns function and start of insn.
+// Prefixed-stub variants disabled for now (reserved for future hardening)
+
 static unsigned long long try_vmcall_getversion(BOOL amd_vmmcall, unsigned long long p1, unsigned long long p3, unsigned long p2, DWORD* ex_code)
 {
   *ex_code = 0;
@@ -416,6 +419,9 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   return 1;
 }
 
+// Probe prefixed variant for RIP advance
+// Prefixed variant probes disabled for now
+
 static hv_call3_t build_vm_stub_with_tf(BOOL amd_vmmcall)
 {
   // Emit tiny code: pushfq; or qword [rsp],0x100; popfq; mov rax,rcx; mov rcx,r8; vm*call; ret
@@ -661,6 +667,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       return info->result;
     }
   }
+
+  // 1.b.2) Prefixed variant probes reserved for future hardening
 
   // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (default ON; can disable with DBVM_DISABLE_FAULT_SEM=1)
   //      ACCESS_VIOLATION here strongly implicates a mediator mapping the pointer. Note: relies on default P1/P3.
