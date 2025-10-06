@@ -170,6 +170,36 @@ static hv_call3_t build_vm_ud_stub(BOOL amd_vmmcall)
   return build_vm_stub(amd_vmmcall);
 }
 
+// PROBE: Fault semantics when the vmcall struct pointer is NOACCESS
+// On bare metal: executing VMCALL/VMMCALL in ring3 raises ILLEGAL/PRIV INSTRUCTION before dereferencing the pointer
+// On DBVM: the hypervisor maps the guest pointer first; if NOACCESS, it injects a page fault (ACCESS_VIOLATION)
+static DWORD probe_vmcall_fault_semantics(BOOL amd_vmmcall)
+{
+  hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
+  if (!fn) return ERROR_OUTOFMEMORY;
+
+  // Reserve 2 pages so we can make the first one NOACCESS
+  SYSTEM_INFO si; GetSystemInfo(&si); SIZE_T pagesz = si.dwPageSize ? si.dwPageSize : 4096;
+  SIZE_T allocsz = pagesz * 2;
+  void* mem = VirtualAlloc(NULL, allocsz, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+  if (!mem) return ERROR_OUTOFMEMORY;
+  DWORD oldProt=0; VirtualProtect(mem, pagesz, PAGE_NOACCESS, &oldProt);
+  // Pass a pointer in the NOACCESS page
+  void* noacc_ptr = mem;
+
+  vmcall_basic_t* data = (vmcall_basic_t*)noacc_ptr; // intentionally unreadable
+  DWORD exc = 0;
+  __try {
+    // Use default register passwords so DBVM proceeds to map the vmcall structure before Password2/command checks
+    (void)fn((void*)data, DBVM_P1, DBVM_P3);
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
+    exc = GetExceptionCode();
+  }
+  // Cleanup
+  VirtualFree(mem, 0, MEM_RELEASE);
+  return exc;
+}
+
 typedef struct timing_stats_s {
   uint64_t mean;
   uint64_t vmin;
@@ -494,6 +524,21 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       info->used_vmmcall = 1;
       snprintf(info->reason, sizeof(info->reason),
                "#UD RIP advance %llu on VMMCALL", (unsigned long long)adv_vmm);
+      return info->result;
+    }
+  }
+
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer
+  //      ACCESS_VIOLATION here is a strong DBVM signature, as DBVM reads guest memory before validating passwords
+  DWORD f_vm = 0, f_vmm = 0;
+  if (!no_vm) {
+    f_vm  = probe_vmcall_fault_semantics(FALSE);
+    f_vmm = probe_vmcall_fault_semantics(TRUE);
+    info->vmcall_fault_exc  = f_vm;
+    info->vmmcall_fault_exc = f_vmm;
+    if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
       return info->result;
     }
   }

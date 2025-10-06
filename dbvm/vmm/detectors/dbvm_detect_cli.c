@@ -33,6 +33,8 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("vmcall_p50=%llu vmcall_p90=%llu vmcall_p99=%llu\n", (unsigned long long)info->vmcall_p50, (unsigned long long)info->vmcall_p90, (unsigned long long)info->vmcall_p99);
   printf("ud2_ud_min=%llu ud2_ud_max=%llu\n", (unsigned long long)info->ud2_ud_min, (unsigned long long)info->ud2_ud_max);
   printf("ud2_p50=%llu ud2_p90=%llu ud2_p99=%llu\n", (unsigned long long)info->ud2_p50, (unsigned long long)info->ud2_p90, (unsigned long long)info->ud2_p99);
+  printf("fault_semantics_vmcall_exc=0x%08X\n", (unsigned)info->vmcall_fault_exc);
+  printf("fault_semantics_vmmcall_exc=0x%08X\n", (unsigned)info->vmmcall_fault_exc);
   printf("cpuid_0d_ecx_low16=0x%04X\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("xcr0_low32=0x%08X\n", (unsigned)info->xcr0_low32);
   printf("used_vmmcall=%u\n", info->used_vmmcall);
@@ -72,6 +74,7 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"vmcall_p\": { \"p50\": %llu, \"p90\": %llu, \"p99\": %llu },\n", (unsigned long long)info->vmcall_p50, (unsigned long long)info->vmcall_p90, (unsigned long long)info->vmcall_p99);
   printf("  \"ud2_ud_min\": %llu, \"ud2_ud_max\": %llu,\n", (unsigned long long)info->ud2_ud_min, (unsigned long long)info->ud2_ud_max);
   printf("  \"ud2_p\": { \"p50\": %llu, \"p90\": %llu, \"p99\": %llu },\n", (unsigned long long)info->ud2_p50, (unsigned long long)info->ud2_p90, (unsigned long long)info->ud2_p99);
+  printf("  \"fault_semantics\": { \"vmcall_exc\": %u, \"vmmcall_exc\": %u },\n", (unsigned)info->vmcall_fault_exc, (unsigned)info->vmmcall_fault_exc);
   printf("  \"cpuid_0d_ecx_low16\": %u,\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("  \"xcr0_low32\": %u,\n", (unsigned)info->xcr0_low32);
   printf("  \"used_vmmcall\": %u,\n", info->used_vmmcall);

@@ -65,6 +65,9 @@ typedef struct {
   uint64_t syscall2_mean; // NtQuerySystemTime
   uint64_t syscall2_min;
   uint64_t syscall2_max;
+  // Fault-semantics probe: exception codes when calling VM instruction with NOACCESS vmcall struct pointer
+  uint32_t vmcall_fault_exc;   // e.g., 0xC0000005 on DBVM, 0xC000001D/0xC0000096 otherwise
+  uint32_t vmmcall_fault_exc;  // same as above (AMD only meaningful)
 } dbvm_detect_info_t;
 
 // Runs detection. Fills info with measurements and decision.
