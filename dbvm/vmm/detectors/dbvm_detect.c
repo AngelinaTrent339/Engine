@@ -312,6 +312,13 @@ static LONG WINAPI vmcall_veh(EXCEPTION_POINTERS* ep)
     g_probe_ctx.capture->tf_exc_count++;
   }
 
+  // For #UD on targeted instruction, record RIP advance if any
+  if (code == EXCEPTION_ILLEGAL_INSTRUCTION && g_probe_ctx.capture) {
+    uint64_t adv = (uint64_t)((unsigned char*)rip - (unsigned char*)g_probe_ctx.target_insn);
+    if (g_probe_ctx.capture->used_vmmcall) g_probe_ctx.capture->vmmcall_rip_advance = adv;
+    else g_probe_ctx.capture->vmcall_rip_advance = adv;
+  }
+
   // Don’t alter context here; just record and let normal SEH unwind
   return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -352,9 +359,34 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   return 1;
 }
 
+static hv_call3_t build_vm_stub_with_tf(BOOL amd_vmmcall)
+{
+  // Emit tiny code: pushfq; or qword [rsp],0x100; popfq; mov rax,rcx; mov rcx,r8; vm*call; ret
+  unsigned char code[32]; size_t i=0;
+  // pushfq
+  code[i++]=0x9C;
+  // or qword [rsp],0x100
+  code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; // or qword ptr [rsp], imm32
+  code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; // 0x100
+  // popfq
+  code[i++]=0x9D;
+  // mov rax, rcx
+  code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8;
+  // mov rcx, r8
+  code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
+  // vmcall/vmmcall
+  code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1);
+  // ret
+  code[i++]=0xC3;
+  void* mem = VirtualAlloc(NULL, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return NULL;
+  memcpy(mem, code, i);
+  return (hv_call3_t)mem;
+}
+
 static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
 {
-  hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
+  hv_call3_t fn = build_vm_stub_with_tf(amd_vmmcall);
   if (!fn) return;
   unsigned char opcode = amd_vmmcall ? 0xD9 : 0xC1;
   unsigned char* insn = find_vm_instruction(fn, opcode);
@@ -376,13 +408,8 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
   if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
 
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-  __try {
-    // Set TF in a local context: emulate pushfq/popfq sequence by calling a small stub that runs with TF set
-    // We can opportunistically set TF by raising a single-step on next instruction: use NtContinue path.
-    fn(&data, 0x11111111ULL, 0x22222222ULL);
-  } __except(EXCEPTION_EXECUTE_HANDLER) {
-    // handled by VEH
-  }
+  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); }
+  __except(EXCEPTION_EXECUTE_HANDLER) { /* expected */ }
   g_probe_ctx.active = 0;
 }
 
@@ -528,18 +555,20 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (opt-in)
   //      ACCESS_VIOLATION here is a strong DBVM signature, as DBVM reads guest memory before validating passwords
-  DWORD f_vm = 0, f_vmm = 0;
-  if (!no_vm) {
-    f_vm  = probe_vmcall_fault_semantics(FALSE);
-    f_vmm = probe_vmcall_fault_semantics(TRUE);
-    info->vmcall_fault_exc  = f_vm;
-    info->vmmcall_fault_exc = f_vmm;
-    if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
-      return info->result;
+  {
+    char usefs[8]; DWORD usefs_dw = GetEnvironmentVariableA("DBVM_USE_FAULT_SEM", usefs, sizeof(usefs));
+    if (!no_vm && usefs_dw>0 && usefs[0]=='1') {
+      DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
+      DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
+      info->vmcall_fault_exc  = f_vm;
+      info->vmmcall_fault_exc = f_vmm;
+      if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
+        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+        snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
+        return info->result;
+      }
     }
   }
 
@@ -630,7 +659,15 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // Enable by setting DBVM_TF_PROBE=1 in the environment.
   {
     char tfen[8]; DWORD tfen_dw = GetEnvironmentVariableA("DBVM_TF_PROBE", tfen, sizeof(tfen));
-    if (!no_vm && tfen_dw>0 && tfen[0]=='1') run_tf_order_probe(FALSE, info); // VMCALL
+    if (!no_vm && tfen_dw>0 && tfen[0]=='1') {
+      run_tf_order_probe(FALSE, info); // VMCALL
+      // If single-step (#DB) arrives before #UD, it strongly indicates hypervisor mediation
+      if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+        snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMCALL");
+        return info->result;
+      }
+    }
   }
 
   // Syscall path timing via ntdll
