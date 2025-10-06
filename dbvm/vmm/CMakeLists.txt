@@ -18,5 +18,4 @@ endif()
 add_executable(dbvm_detect_cli
   detectors/dbvm_detect_cli.c
 )
-target_link_libraries(dbvm_detect_cli PRIVATE dbvm_detect)
-
+target_link_libraries(dbvm_detect_cli PRIVATE dbvm_detect user32)

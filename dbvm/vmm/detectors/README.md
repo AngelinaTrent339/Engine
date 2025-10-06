@@ -18,8 +18,12 @@ cmake --build build --config Release
 2) Run the CLI:
 
 ```
-build/Release/dbvm_detect_cli.exe
+build/Release/dbvm_detect_cli.exe --pause
 ```
+
+Options:
+- `--pause`: wait for keypress before exit (useful when launching manually)
+- `--json`: print JSON output instead of text
 
 Output fields:
 - `result`: NO_HYPERVISOR | DBVM_CONFIRMED | OTHER_HYPERVISOR | DBVM_SUSPECT | INDETERMINATE
@@ -36,4 +40,3 @@ Notes:
 - If that fails, it applies password-agnostic side-channels (timing deltas + CPUID/XGETBV invariants).
 - On systems with Hyper‑V or other HVs, `hv_present_bit=1` and no DBVM signature → `OTHER_HYPERVISOR`.
 - The timing test uses modest iteration count (64) to keep it fast. Increase in `dbvm_detect.c` if needed.
-
