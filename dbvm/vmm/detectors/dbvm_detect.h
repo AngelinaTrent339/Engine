@@ -53,6 +53,7 @@ typedef struct {
   uint8_t  sig_tf_prefixed;   // TF-first on any prefixed VM*CALL (66/F3/F2/67/48), cross-core
   uint8_t  sig_svm_suite;     // TF-first/sequence hit on any two SVM opcodes (0F 01 D8..DF)
   uint8_t  sig_desc;          // SGDT/SIDT guest-style majority
+  uint8_t  sig_tf_mem_av;     // Mem-based TF enable causes ACCESS_VIOLATION on VM*CALL (DBVM-only quirk)
   // TF/#DB vs #UD sequencing
   uint32_t tf_exc_count;           // number of exceptions captured (max 4)
   uint32_t tf_exc_codes[4];        // ordered exception codes

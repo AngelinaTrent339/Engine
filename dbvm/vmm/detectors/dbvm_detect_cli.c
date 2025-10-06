@@ -53,11 +53,12 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
     }
   }
   // Signals summary
-  printf("signals=TF%s TFpref%s SVM%s DESC%s\n",
+  printf("signals=TF%s TFpref%s SVM%s DESC%s MEMAV%s\n",
          info->sig_tf_plain?"+":"-",
          info->sig_tf_prefixed?"+":"-",
          info->sig_svm_suite?"+":"-",
-         info->sig_desc?"+":"-");
+         info->sig_desc?"+":"-",
+         info->sig_tf_mem_av?"+":"-");
   printf("cpu_vendor=%s\n", info->cpu_vendor);
   printf("cpuid_80000001_ecx=0x%08X\n", info->cpuid_80000001_ecx);
   printf("cpuid_8000000a_eax=0x%08X\n", info->cpuid_8000000a_eax);
@@ -127,7 +128,14 @@ int main(int argc, char** argv)
   if (no_vm) SetEnvironmentVariableA("DBVM_NO_VM", "1");
 
   dbvm_detect_info_t info;
-  dbvm_detect_result_t r = dbvm_detect_run(&info);
+  dbvm_detect_result_t r = DBVM_DETECT_INDETERMINATE;
+  __try {
+    r = dbvm_detect_run(&info);
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
+    memset(&info, 0, sizeof(info));
+    snprintf(info.reason, sizeof(info.reason), "EXCEPTION 0x%08X during detection", (unsigned)GetExceptionCode());
+    r = DBVM_DETECT_INDETERMINATE;
+  }
 
   if (json) print_json(&info, r);
   else      print_text(&info, r);

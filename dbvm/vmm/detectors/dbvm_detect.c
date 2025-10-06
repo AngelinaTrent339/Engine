@@ -107,10 +107,12 @@ static int run_cross_core_consistent(probe_fn_t fn, void* ctx)
   HANDLE th = GetCurrentThread();
   DWORD_PTR old = SetThreadAffinityMask(th, m1);
   int a = fn(ctx);
+  Sleep(0);
   int b = 0;
   if (n==2) {
     SetThreadAffinityMask(th, m2);
     b = fn(ctx);
+    Sleep(0);
   } else {
     b = a;
   }
@@ -475,19 +477,59 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   return 1;
 }
 
-// Now that VEH/types exist, define generic TF probe for arbitrary bytes
-static int probe_one_insn_tf_first(unsigned char prefix_or_00, unsigned char b1, unsigned char b2, unsigned char b3,
-                                   uint8_t* out_first_is_ss)
+// NtContinue-based TF probe for arbitrary instruction bytes (password-free, no stack touch)
+typedef LONG (NTAPI *NtContinue_t)(PCONTEXT, BOOLEAN);
+static int probe_one_insn_tf_first_ntc(unsigned char prefix_or_00, unsigned char b1, unsigned char b2, unsigned char b3,
+                                       dbvm_detect_info_t* out)
+{
+  unsigned char code[16]; size_t i=0;
+  // prefix (optional)
+  if (prefix_or_00) code[i++]=prefix_or_00;
+  // instruction bytes
+  code[i++]=b1; code[i++]=b2; code[i++]=b3;
+  // ret (won't be reached if instruction faults)
+  code[i++]=0xC3;
+  void* mem = VirtualAlloc(NULL, 128, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return 0;
+  memcpy(mem, code, i);
+
+  // Arm probe
+  g_probe_ctx.target_insn = (unsigned char*)mem;
+  g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 8;
+  g_probe_ctx.capture     = out;
+  g_probe_ctx.active      = 1;
+  g_probe_ctx.max_records = 4;
+  static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+
+  // NtContinue TF enable at instruction address
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  NtContinue_t pNtContinue = (NtContinue_t)(ntdll ? GetProcAddress(ntdll, "NtContinue") : NULL);
+  if (!pNtContinue) { g_probe_ctx.active=0; return 0; }
+  CONTEXT ctx; RtlCaptureContext(&ctx);
+  ctx.ContextFlags = CONTEXT_ALL;
+  ctx.Rip = (DWORD64)g_probe_ctx.target_insn;
+  ctx.EFlags |= 0x100; // TF
+  __try { (void)pNtContinue(&ctx, FALSE); }
+  __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active = 0;
+
+  int ok = (out && out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
+  return ok ? 1 : 0;
+}
+
+// Mem-based TF probe (pushfq; or [rsp],0x100; popfq), then execute instruction bytes via call stub
+static int probe_one_insn_tf_first_mem(unsigned char prefix_or_00, unsigned char b1, unsigned char b2, unsigned char b3,
+                                       dbvm_detect_info_t* out, DWORD* first_exc)
 {
   unsigned char code[64]; size_t i=0;
   // mov rax, rcx; mov rcx, r8
   code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
-  // pushfq; or qword [rsp],0x100; popfq
-  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
-  // prefix (optional, 0 means none)
+  // pushfq; pop rdx; or rdx,0x100; push rdx; popfq
+  code[i++]=0x9C; code[i++]=0x5A; code[i++]=0x48; code[i++]=0x81; code[i++]=0xCA; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x52; code[i++]=0x9D;
+  // prefix (optional)
   unsigned char* insn = &code[i];
   if (prefix_or_00) code[i++]=prefix_or_00;
-  // bytes for instruction
+  // instruction bytes
   code[i++]=b1; code[i++]=b2; code[i++]=b3;
   // ret
   code[i++]=0xC3;
@@ -495,21 +537,18 @@ static int probe_one_insn_tf_first(unsigned char prefix_or_00, unsigned char b1,
   if (!mem) return 0;
   memcpy(mem, code, i);
 
-  // Arm probe
   g_probe_ctx.target_insn = ((unsigned char*)mem) + (insn - code);
   g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 6;
-  g_probe_ctx.active      = 1;
-  g_probe_ctx.max_records = 4;
+  g_probe_ctx.capture     = out; g_probe_ctx.active=1; g_probe_ctx.max_records=4;
   static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
 
   hv_call3_t fn = (hv_call3_t)mem;
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
-  g_probe_ctx.active = 0;
-
-  int ok = (g_probe_ctx.capture && g_probe_ctx.capture->tf_exc_count>=1 && g_probe_ctx.capture->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
-  if (out_first_is_ss) *out_first_is_ss = ok ? 1 : 0;
-  return ok ? 1 : 0;
+  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); }
+  __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active=0;
+  if (first_exc) *first_exc = (out->tf_exc_count>=1)? out->tf_exc_codes[0] : 0;
+  return (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
 }
 
 // Prefixed TF-first probe for password-free confirm
@@ -518,8 +557,8 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
   unsigned char code[64]; size_t i=0;
   // mov rax, rcx; mov rcx, r8
   code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
-  // pushfq; or qword [rsp],0x100; popfq
-  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
+  // pushfq; pop rdx; or rdx,0x100; push rdx; popfq
+  code[i++]=0x9C; code[i++]=0x5A; code[i++]=0x48; code[i++]=0x81; code[i++]=0xCA; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x52; code[i++]=0x9D;
   // prefix and vm*call
   unsigned char* insn = &code[i];
   code[i++] = prefix;
@@ -550,13 +589,15 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
 
 static hv_call3_t build_vm_stub_with_tf(BOOL amd_vmmcall)
 {
-  // Emit tiny code: mov rax,rcx; mov rcx,r8; pushfq; or [rsp],0x100; popfq; vm*call; ret
+  // Emit tiny code: mov rax,rcx; mov rcx,r8; pushfq; pop rdx; or rdx,0x100; push rdx; popfq; vm*call; ret
   unsigned char code[48]; size_t i=0;
   code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; // mov rax,rcx
   code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1; // mov rcx,r8
   code[i++]=0x9C; // pushfq
-  code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; // or qword [rsp],imm32
+  code[i++]=0x5A; // pop rdx
+  code[i++]=0x48; code[i++]=0x81; code[i++]=0xCA; // or rdx, imm32
   code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; // 0x100
+  code[i++]=0x52; // push rdx
   code[i++]=0x9D; // popfq
   code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1); // vm*call
   code[i++]=0xC3; // ret
@@ -599,8 +640,8 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
 static int tf_first_plain_once(BOOL amd_vmmcall, dbvm_detect_info_t* out)
 {
   out->tf_exc_count = 0;
-  run_tf_order_probe(amd_vmmcall, out);
-  return (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
+  unsigned char opcode = amd_vmmcall ? 0xD9 : 0xC1;
+  DWORD first=0; return probe_one_insn_tf_first_mem(0x00, 0x0F, 0x01, opcode, out, &first);
 }
 
 typedef struct { BOOL amd; dbvm_detect_info_t* out; } tf_ctx_t;
@@ -618,11 +659,41 @@ static int tf_first_plain_crosscore(dbvm_detect_info_t* out)
   return 0;
 }
 
+// Register-based TF probe for arbitrary instruction bytes (no stack touch)
+static int probe_one_insn_tf_first_reg(unsigned char prefix_or_00, unsigned char b1, unsigned char b2, unsigned char b3,
+                                       dbvm_detect_info_t* out, DWORD* first_exc)
+{
+  unsigned char code[64]; size_t i=0;
+  // pushfq; pop rdx; or rdx,0x100; push rdx; popfq
+  code[i++]=0x9C; // pushfq
+  code[i++]=0x5A; // pop rdx
+  code[i++]=0x48; code[i++]=0x81; code[i++]=0xCA; // or rdx, imm32
+  code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; // 0x100
+  code[i++]=0x52; // push rdx
+  code[i++]=0x9D; // popfq
+  // instruction
+  unsigned char* insn = &code[i];
+  if (prefix_or_00) code[i++]=prefix_or_00;
+  code[i++]=b1; code[i++]=b2; code[i++]=b3;
+  code[i++]=0xC3; // ret
+  void* mem = VirtualAlloc(NULL, 128, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return 0;
+  memcpy(mem, code, i);
+  g_probe_ctx.target_insn = ((unsigned char*)mem) + (insn - code);
+  g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 6;
+  g_probe_ctx.active=1; g_probe_ctx.max_records=4;
+  static PVOID veh=NULL; if (!veh) veh=AddVectoredExceptionHandler(1,(PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+  __try { ((void(__cdecl*)(void))mem)(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active=0;
+  if (first_exc) *first_exc = (out && out->tf_exc_count>=1)? out->tf_exc_codes[0] : 0;
+  return (out && out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
+}
+
 // Prefixed VM*CALL set TF-first probe across 66/F3/F2/67/48; cross-core consistency required
 typedef struct { BOOL amd; dbvm_detect_info_t* out; unsigned char prefix; } tfpref_ctx_t;
 static int tfpref_probe_thunk(void* p)
 {
-  tfpref_ctx_t* c = (tfpref_ctx_t*)p; return probe_prefixed_tf_first(c->amd, c->prefix, c->out);
+  tfpref_ctx_t* c = (tfpref_ctx_t*)p; unsigned char opcode = c->amd ? 0xD9 : 0xC1; DWORD first=0; return probe_one_insn_tf_first_mem(c->prefix, 0x0F, 0x01, opcode, c->out, &first);
 }
 
 static int tf_first_prefixed_crosscore(dbvm_detect_info_t* out)
@@ -638,6 +709,42 @@ static int tf_first_prefixed_crosscore(dbvm_detect_info_t* out)
   return 0;
 }
 
+// Compute Mem-TF AV vote for VM*CALL: true when mem-TF causes ACCESS_VIOLATION and NtContinue-TF does not
+static int tf_mem_av_for_opcode(BOOL amd_vmmcall, dbvm_detect_info_t* out, int tries)
+{
+  unsigned char opcode = amd_vmmcall ? 0xD9 : 0xC1; // VMMCALL or VMCALL
+  DWORD_PTR m1=0,m2=0; pick_two_affinity_masks(&m1,&m2);
+  HANDLE th = GetCurrentThread(); DWORD_PTR old = SetThreadAffinityMask(th, m1);
+  int mem_av_hits = 0, ntc_av_hits = 0;
+  for (int t=0;t<tries;t++) {
+    out->tf_exc_count = 0; DWORD first=0; probe_one_insn_tf_first_mem(0x00, 0x0F, 0x01, opcode, out, &first);
+    if (first==EXCEPTION_ACCESS_VIOLATION) mem_av_hits++;
+    out->tf_exc_count = 0; DWORD ntc_first=0; (void)probe_one_insn_tf_first_reg(0x00, 0x0F, 0x01, opcode, out, &ntc_first);
+    if (ntc_first==EXCEPTION_ACCESS_VIOLATION) ntc_av_hits++;
+    Sleep(0);
+  }
+  if (m2) {
+    SetThreadAffinityMask(th, m2);
+    for (int t=0;t<tries;t++) {
+      out->tf_exc_count = 0; DWORD first=0; probe_one_insn_tf_first_mem(0x00, 0x0F, 0x01, opcode, out, &first);
+      if (first==EXCEPTION_ACCESS_VIOLATION) mem_av_hits++;
+      out->tf_exc_count = 0; DWORD ntc_first=0; (void)probe_one_insn_tf_first_reg(0x00, 0x0F, 0x01, opcode, out, &ntc_first);
+      if (ntc_first==EXCEPTION_ACCESS_VIOLATION) ntc_av_hits++;
+      Sleep(0);
+    }
+  }
+  if (old) SetThreadAffinityMask(th, old);
+  // Vote true only if mem TF produced AV at least once and NtContinue TF produced no AVs
+  return (mem_av_hits>=1 && ntc_av_hits==0) ? 1 : 0;
+}
+
+static int tf_mem_av_vote(dbvm_detect_info_t* out)
+{
+  int v1 = tf_mem_av_for_opcode(TRUE, out, 2);  // VMMCALL
+  int v2 = tf_mem_av_for_opcode(FALSE, out, 2); // VMCALL
+  return (v1 || v2) ? 1 : 0;
+}
+
 // SVM opcode suite TF-first/sequence probe; returns 1 if at least 2 opcodes yield TF-first or consistent non-bare ordering
 static int svm_suite_probe(dbvm_detect_info_t* out)
 {
@@ -648,7 +755,7 @@ static int svm_suite_probe(dbvm_detect_info_t* out)
     out->tf_exc_count = 0;
     // prefix 0, then 0F 01 xx
     g_probe_ctx.capture = out; // ensure capture points at 'out'
-    probe_one_insn_tf_first(0x00, 0x0F, 0x01, opcodes[i], NULL);
+    DWORD first=0; (void)first; probe_one_insn_tf_first_mem(0x00, 0x0F, 0x01, opcodes[i], out, &first);
     // vote if first is SINGLE_STEP or if we see a consistent two-#UD with TF set
     if (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) { hits++; }
     else if (out->tf_exc_count>=2 && out->tf_exc_codes[0]==EXCEPTION_ILLEGAL_INSTRUCTION && out->tf_exc_codes[1]==EXCEPTION_ILLEGAL_INSTRUCTION && (out->tf_exc_eflags[0] & 0x100)) { hits++; }
@@ -872,22 +979,30 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // 2) Password-agnostic side-channels
   info->hv_vendor_leaf_present = (uint32_t)hypervisor_present_bit();
 
-  // Signals (password-free)
-  int sig_tf_plain = tf_first_plain_crosscore(info);
-  int sig_tf_pref  = tf_first_prefixed_crosscore(info);
-  int sig_svm      = svm_suite_probe(info);
-  int sig_desc     = sgdt_sidt_gueststyle_confirm();
+  // Signals (password-free). Strict probes are opt-in to prevent crashes on some systems.
+  int sig_tf_plain = 0, sig_tf_pref = 0, sig_svm = 0, sig_desc = 0, sig_memav = 0;
+  {
+    char strict[8]; DWORD strict_dw = GetEnvironmentVariableA("DBVM_STRICT", strict, sizeof(strict));
+    if (strict_dw>0 && (strict[0]=='1' || strict[0]=='Y' || strict[0]=='y')) {
+      sig_tf_plain = tf_first_plain_crosscore(info);
+      sig_tf_pref  = tf_first_prefixed_crosscore(info);
+      sig_svm      = svm_suite_probe(info);
+      sig_desc     = sgdt_sidt_gueststyle_confirm();
+      sig_memav    = tf_mem_av_vote(info);
+    }
+  }
   info->sig_tf_plain    = (uint8_t)(sig_tf_plain?1:0);
   info->sig_tf_prefixed = (uint8_t)(sig_tf_pref?1:0);
   info->sig_svm_suite   = (uint8_t)(sig_svm?1:0);
   info->sig_desc        = (uint8_t)(sig_desc?1:0);
+  info->sig_tf_mem_av   = (uint8_t)(sig_memav?1:0);
 
-  // Majority vote (2-of-4) among signals above (no timing, no passwords)
-  int votes = (sig_tf_plain?1:0) + (sig_tf_pref?1:0) + (sig_svm?1:0) + (sig_desc?1:0);
+  // Majority vote (2-of-5) among signals above (no timing, no passwords)
+  int votes = (sig_tf_plain?1:0) + (sig_tf_pref?1:0) + (sig_svm?1:0) + (sig_desc?1:0) + (sig_memav?1:0);
   if (votes >= 2) {
     run_measurements(info, (int)no_vm);
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason), "Confirm (2/4) password-free signals");
+    snprintf(info->reason, sizeof(info->reason), "Confirm (2/5) password-free signals");
     return info->result;
   }
 
@@ -987,3 +1102,5 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   snprintf(info->reason, sizeof(info->reason), "No DBVM indicators detected");
   return info->result;
 }
+
+
