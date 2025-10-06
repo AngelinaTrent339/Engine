@@ -406,12 +406,25 @@ typedef struct {
 
 static vmcall_exc_state g_vmexc_state;
 static struct probe_ctx_s g_probe_ctx;
+static dbvm_detect_info_t* g_seh_out = NULL;
+static struct probe_ctx_s g_probe_ctx;
 
 // SEH filter used with __except to capture RIP advance for a single invalid VM instruction
 static LONG vmcall_seh_filter(EXCEPTION_POINTERS* ep)
 {
   g_vmexc_state.exception_code = ep->ExceptionRecord->ExceptionCode;
   g_vmexc_state.rip_after      = ep->ContextRecord->Rip;
+  return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// SEH filter that records first exception code/eflags into g_seh_out (for mem-TF probes)
+static LONG mem_tf_seh_filter(EXCEPTION_POINTERS* ep)
+{
+  if (g_seh_out && g_seh_out->tf_exc_count==0) {
+    g_seh_out->tf_exc_codes[0]  = ep->ExceptionRecord->ExceptionCode;
+    g_seh_out->tf_exc_eflags[0] = (uint32_t)ep->ContextRecord->EFlags;
+    g_seh_out->tf_exc_count = 1;
+  }
   return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -510,7 +523,7 @@ static int probe_one_insn_tf_first_ntc(unsigned char prefix_or_00, unsigned char
   ctx.Rip = (DWORD64)g_probe_ctx.target_insn;
   ctx.EFlags |= 0x100; // TF
   __try { (void)pNtContinue(&ctx, FALSE); }
-  __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __except(mem_tf_seh_filter(GetExceptionInformation())) {}
   g_probe_ctx.active = 0;
 
   int ok = (out && out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
@@ -545,7 +558,7 @@ static int probe_one_insn_tf_first_mem(unsigned char prefix_or_00, unsigned char
   hv_call3_t fn = (hv_call3_t)mem;
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
   __try { fn(&data, 0x11111111ULL, 0x22222222ULL); }
-  __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __except(mem_tf_seh_filter(GetExceptionInformation())) {}
   g_probe_ctx.active=0;
   if (first_exc) *first_exc = (out->tf_exc_count>=1)? out->tf_exc_codes[0] : 0;
   return (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
@@ -578,7 +591,7 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
   if (amd_vmmcall) g_probe_ctx.rip_out = &out->pref_vmmcall_rip_advance; else g_probe_ctx.rip_out = &out->pref_vmcall_rip_advance;
   static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(mem_tf_seh_filter(GetExceptionInformation())) {}
   g_probe_ctx.active = 0; g_probe_ctx.rip_out = NULL;
   DWORD ok = (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
   return ok ? 1 : 0;
@@ -683,7 +696,7 @@ static int probe_one_insn_tf_first_reg(unsigned char prefix_or_00, unsigned char
   g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 6;
   g_probe_ctx.active=1; g_probe_ctx.max_records=4;
   static PVOID veh=NULL; if (!veh) veh=AddVectoredExceptionHandler(1,(PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
-  __try { ((void(__cdecl*)(void))mem)(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __try { ((void(__cdecl*)(void))mem)(); } __except(mem_tf_seh_filter(GetExceptionInformation())) {}
   g_probe_ctx.active=0;
   if (first_exc) *first_exc = (out && out->tf_exc_count>=1)? out->tf_exc_codes[0] : 0;
   return (out && out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
@@ -1102,5 +1115,10 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   snprintf(info->reason, sizeof(info->reason), "No DBVM indicators detected");
   return info->result;
 }
+
+
+
+
+
 
 
