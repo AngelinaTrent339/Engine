@@ -30,6 +30,10 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("cpuid_0d_ecx_low16=0x%04X\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("xcr0_low32=0x%08X\n", (unsigned)info->xcr0_low32);
   printf("used_vmmcall=%u\n", info->used_vmmcall);
+  printf("idtr_limit=0x%04X\n", info->idtr_limit);
+  printf("gdtr_limit=0x%04X\n", info->gdtr_limit);
+  printf("vmcall_rip_advance=%llu\n", (unsigned long long)info->vmcall_rip_advance);
+  printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
 }
 
 static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
@@ -42,7 +46,11 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"ud2_ud_cycles\": %llu,\n", (unsigned long long)info->ud2_ud_cycles);
   printf("  \"cpuid_0d_ecx_low16\": %u,\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("  \"xcr0_low32\": %u,\n", (unsigned)info->xcr0_low32);
-  printf("  \"used_vmmcall\": %u\n", info->used_vmmcall);
+  printf("  \"used_vmmcall\": %u,\n", info->used_vmmcall);
+  printf("  \"idtr_limit\": %u,\n", (unsigned)info->idtr_limit);
+  printf("  \"gdtr_limit\": %u,\n", (unsigned)info->gdtr_limit);
+  printf("  \"vmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmcall_rip_advance);
+  printf("  \"vmmcall_rip_advance\": %llu\n", (unsigned long long)info->vmmcall_rip_advance);
   printf("}\n");
 }
 

@@ -33,6 +33,8 @@ typedef struct {
   // Descriptor table snapshots
   uint16_t idtr_limit;             // SIDT limit (expect ~0x0FFF on Win x64)
   uint16_t gdtr_limit;             // SGDT limit (OS-dependent, but never 0x0058)
+  uint64_t vmcall_rip_advance;     // bytes RIP advanced after #UD (intel path)
+  uint64_t vmmcall_rip_advance;    // bytes RIP advanced after #UD (amd path)
 } dbvm_detect_info_t;
 
 // Runs detection. Fills info with measurements and decision.

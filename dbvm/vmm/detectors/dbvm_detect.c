@@ -5,6 +5,45 @@
 #include <intrin.h>
 #include <string.h>
 
+// ---- SGDT / SIDT helpers (user-mode safe) ----
+typedef void (WINAPI *sidt_fn_t)(void* out);
+typedef void (WINAPI *sgdt_fn_t)(void* out);
+
+#pragma pack(push, 1)
+typedef struct { uint16_t limit; uint64_t base; } desc_ptr_t;
+#pragma pack(pop)
+
+static sidt_fn_t build_sidt_stub(void)
+{
+  // bytes: 0F 01 09  C3   => sidt [rcx]; ret
+  unsigned char code[] = {0x0F, 0x01, 0x09, 0xC3};
+  void* mem = VirtualAlloc(NULL, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return NULL;
+  memcpy(mem, code, sizeof(code));
+  return (sidt_fn_t)mem;
+}
+
+static sgdt_fn_t build_sgdt_stub(void)
+{
+  // bytes: 0F 01 01  C3   => sgdt [rcx]; ret
+  unsigned char code[] = {0x0F, 0x01, 0x01, 0xC3};
+  void* mem = VirtualAlloc(NULL, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return NULL;
+  memcpy(mem, code, sizeof(code));
+  return (sgdt_fn_t)mem;
+}
+
+static void read_descriptor_tables(uint16_t* idt_lim, uint16_t* gdt_lim)
+{
+  desc_ptr_t idt = {0}, gdt = {0};
+  sidt_fn_t sidtfn = build_sidt_stub();
+  sgdt_fn_t sgdtfn = build_sgdt_stub();
+  if (sidtfn) sidtfn(&idt);
+  if (sgdtfn) sgdtfn(&gdt);
+  if (idt_lim) *idt_lim = idt.limit;
+  if (gdt_lim) *gdt_lim = gdt.limit;
+}
+
 typedef struct _vmcall_basic {
   uint32_t size;      // must be >= 12
   uint32_t password2; // default 0xFEDCBA98
@@ -156,6 +195,56 @@ static uint64_t measure_ud_path_cycles_ud2(void)
   return ok ? (total / ok) : 0;
 }
 
+typedef struct {
+  uint64_t vm_insn;
+  uint64_t rip_after;
+  DWORD    exception_code;
+} vmcall_exc_state;
+
+static vmcall_exc_state g_vmexc_state;
+
+static LONG vmcall_exception_filter(EXCEPTION_POINTERS* ep)
+{
+  g_vmexc_state.exception_code = ep->ExceptionRecord->ExceptionCode;
+  g_vmexc_state.rip_after = ep->ContextRecord->Rip;
+  return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static unsigned char* find_vm_instruction(hv_call3_t fn, unsigned char opcode)
+{
+  unsigned char* p = (unsigned char*)fn;
+  for (int i=0; i<32; i++) {
+    if (p[i] == 0x0F && p[i+1] == 0x01 && p[i+2] == opcode)
+      return p + i;
+  }
+  return NULL;
+}
+
+static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
+{
+  hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
+  if (!fn) return 0;
+  unsigned char opcode = amd_vmmcall ? 0xD9 : 0xC1;
+  unsigned char* insn = find_vm_instruction(fn, opcode);
+  if (!insn) return 0;
+
+  g_vmexc_state.vm_insn = (uint64_t)insn;
+  g_vmexc_state.exception_code = 0;
+  g_vmexc_state.rip_after = 0;
+
+  vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+  __try {
+    fn(&data, 0x11111111ULL, 0x22222222ULL);
+  } __except(vmcall_exception_filter(GetExceptionInformation())) {}
+
+  if (g_vmexc_state.exception_code != EXCEPTION_ILLEGAL_INSTRUCTION)
+    return 0;
+
+  if (advance_bytes)
+    *advance_bytes = g_vmexc_state.rip_after - g_vmexc_state.vm_insn;
+  return 1;
+}
+
 static void cpuid_ex(uint32_t leaf, uint32_t subleaf, uint32_t out[4])
 {
   int regs[4] = {0};
@@ -182,6 +271,22 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   if (n>0 && n < sizeof(envbuf)) {
     int p = atoi(envbuf);
     if (p >= 5 && p <= 100) threshold_pct = p;
+  }
+
+  // 0) Descriptor-table signature check (DBVM bug present in this source)
+  //    vmxsetup.c sets guest IDT limit to 8*256 and GDT limit to 88, not size-1.
+  //    On Windows x64, IDT limit is typically 16*256-1 = 4095 (0x0FFF).
+  read_descriptor_tables(&info->idtr_limit, &info->gdtr_limit);
+  if (info->idtr_limit != 0 && info->idtr_limit != 0x0FFF) {
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    return info->result;
+  }
+
+  // DBVM bug: vmxsetup.c sets GDT limit to 88 (0x58). We observe 0x58..0x80 due to internal expansions.
+  // Windows x64 normally reports GDT limits well over 0x2F0. Treat any <=0x90 as DBVM.
+  if (info->gdtr_limit != 0 && info->gdtr_limit <= 0x0090) {
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    return info->result;
   }
 
   // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults
@@ -213,6 +318,24 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       info->dbvm_version = ver;
       info->used_vmmcall = used_vmmcall;
+      return info->result;
+    }
+  }
+
+  // 1.b) RIP advance check on failing VMCALL/VMMCALL (#UD injection bug)
+  uint64_t adv_vm=0, adv_vmm=0;
+  if (detect_vmcall_rip_advance(FALSE, &adv_vm)) {
+    info->vmcall_rip_advance = adv_vm;
+    if (adv_vm >= 3) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      return info->result;
+    }
+  }
+  if (detect_vmcall_rip_advance(TRUE, &adv_vmm)) {
+    info->vmmcall_rip_advance = adv_vmm;
+    if (adv_vmm >= 3) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      info->used_vmmcall = 1;
       return info->result;
     }
   }
