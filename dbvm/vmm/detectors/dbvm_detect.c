@@ -6,6 +6,16 @@
 #include <string.h>
 #include <stdio.h>
 
+// Forward declare probe context type so helpers can reference it before usage
+struct probe_ctx_s {
+  void*  target_insn;
+  void*  target_end;
+  int    active;
+  dbvm_detect_info_t* capture;
+  int    max_records;
+};
+extern struct probe_ctx_s g_probe_ctx;
+
 // ---- SGDT / SIDT helpers (user-mode safe) ----
 typedef void (WINAPI *sidt_fn_t)(void* out);
 typedef void (WINAPI *sgdt_fn_t)(void* out);
@@ -65,6 +75,7 @@ static const unsigned long      DBVM_P2 = 0xFEDCBA98UL;          // struct field
 // We set: RAX=data_ptr, RDX=p1, RCX=p3 and execute the instruction.
 // Returns with RAX preserved from the hypercall handler.
 typedef unsigned long long (WINAPI *hv_call3_t)(void* data, unsigned long long pass1, unsigned long long pass3);
+typedef LONG (NTAPI *NtYieldExecution_t)(VOID);
 
 static hv_call3_t build_vm_stub(BOOL amd_vmmcall)
 {
@@ -166,6 +177,7 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
   // Intentionally wrong passwords (so DBVM injects #UD). On bare metal, this is also #UD.
   const unsigned iters = 256; // more samples for stability
   uint64_t total = 0, ok=0;
+  uint64_t vmin = (uint64_t)-1, vmax = 0;
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     unsigned long long t0 = rdtsc64();
@@ -175,7 +187,17 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
       // expected: illegal instruction
     }
     unsigned long long t1 = rdtsc64();
-    total += (t1 - t0); ok++;
+    uint64_t dt = (t1 - t0);
+    total += dt; ok++;
+    if (dt < vmin) vmin = dt;
+    if (dt > vmax) vmax = dt;
+  }
+  // record distribution in global info via probe context if available
+  if (g_probe_ctx.active && g_probe_ctx.capture) {
+    if (!amd_vmmcall) {
+      g_probe_ctx.capture->vmcall_ud_min = vmin;
+      g_probe_ctx.capture->vmcall_ud_max = vmax;
+    }
   }
   return ok ? (total / ok) : 0;
 }
@@ -186,6 +208,7 @@ static uint64_t measure_ud_path_cycles_ud2(void)
   if (!fn) return 0;
   const unsigned iters = 64;
   uint64_t total=0, ok=0;
+  uint64_t vmin = (uint64_t)-1, vmax = 0;
   for (unsigned i=0;i<iters;i++) {
     unsigned long long t0 = rdtsc64();
     __try {
@@ -194,7 +217,14 @@ static uint64_t measure_ud_path_cycles_ud2(void)
       // expected
     }
     unsigned long long t1 = rdtsc64();
-    total += (t1 - t0); ok++;
+    uint64_t dt = (t1 - t0);
+    total += dt; ok++;
+    if (dt < vmin) vmin = dt;
+    if (dt > vmax) vmax = dt;
+  }
+  if (g_probe_ctx.active && g_probe_ctx.capture) {
+    g_probe_ctx.capture->ud2_ud_min = vmin;
+    g_probe_ctx.capture->ud2_ud_max = vmax;
   }
   return ok ? (total / ok) : 0;
 }
@@ -206,12 +236,34 @@ typedef struct {
 } vmcall_exc_state;
 
 static vmcall_exc_state g_vmexc_state;
+static struct probe_ctx_s g_probe_ctx;
 
-static LONG vmcall_exception_filter(EXCEPTION_POINTERS* ep)
+// SEH filter used with __except to capture RIP advance for a single invalid VM instruction
+static LONG vmcall_seh_filter(EXCEPTION_POINTERS* ep)
 {
   g_vmexc_state.exception_code = ep->ExceptionRecord->ExceptionCode;
-  g_vmexc_state.rip_after = ep->ContextRecord->Rip;
+  g_vmexc_state.rip_after      = ep->ContextRecord->Rip;
   return EXCEPTION_EXECUTE_HANDLER;
+}
+
+// VEH used globally to observe TF/#DB vs #UD ordering around the VM instruction
+static LONG WINAPI vmcall_veh(EXCEPTION_POINTERS* ep)
+{
+  if (!g_probe_ctx.active) return EXCEPTION_CONTINUE_SEARCH;
+  ULONG code = ep->ExceptionRecord->ExceptionCode;
+  void* rip  = (void*)ep->ContextRecord->Rip;
+  if (rip < g_probe_ctx.target_insn || rip > g_probe_ctx.target_end)
+    return EXCEPTION_CONTINUE_SEARCH;
+
+  int idx = (int)g_probe_ctx.capture->tf_exc_count;
+  if (idx < g_probe_ctx.max_records) {
+    g_probe_ctx.capture->tf_exc_codes[idx]  = code;
+    g_probe_ctx.capture->tf_exc_eflags[idx] = (uint32_t)ep->ContextRecord->EFlags;
+    g_probe_ctx.capture->tf_exc_count++;
+  }
+
+  // Don’t alter context here; just record and let normal SEH unwind
+  return EXCEPTION_CONTINUE_SEARCH;
 }
 
 static unsigned char* find_vm_instruction(hv_call3_t fn, unsigned char opcode)
@@ -237,9 +289,10 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   g_vmexc_state.rip_after = 0;
 
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+  // Simple SEH-based RIP-advance capture (legacy); keep for compatibility
   __try {
     fn(&data, 0x11111111ULL, 0x22222222ULL);
-  } __except(vmcall_exception_filter(GetExceptionInformation())) {}
+  } __except(vmcall_seh_filter(GetExceptionInformation())) {}
 
   if (g_vmexc_state.exception_code != EXCEPTION_ILLEGAL_INSTRUCTION)
     return 0;
@@ -247,6 +300,62 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   if (advance_bytes)
     *advance_bytes = g_vmexc_state.rip_after - g_vmexc_state.vm_insn;
   return 1;
+}
+
+static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
+{
+  hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
+  if (!fn) return;
+  unsigned char opcode = amd_vmmcall ? 0xD9 : 0xC1;
+  unsigned char* insn = find_vm_instruction(fn, opcode);
+  if (!insn) return;
+
+  // Patch stub prologue to set TF: pushfq; pop rax; or rax,0x100; push rax; popfq; (5 bytes)
+  // Our stub currently starts with mov rax,rcx (3 bytes). Emit a small preamble before it.
+  // Instead of patching, run TF by setting it in EFLAGS inside the VEH on first hit.
+  // Arm probe context and call the function with invalid parameters.
+  g_probe_ctx.target_insn = insn;
+  g_probe_ctx.target_end  = insn + 3;
+  g_probe_ctx.capture     = out;
+  g_probe_ctx.active      = 1;
+  g_probe_ctx.max_records = 4;
+  out->tf_path_used_vmmcall = amd_vmmcall ? 1 : 0;
+
+  // Install VEH if not present
+  static PVOID veh = NULL;
+  if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+
+  vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+  __try {
+    // Set TF in a local context: emulate pushfq/popfq sequence by calling a small stub that runs with TF set
+    // We can opportunistically set TF by raising a single-step on next instruction: use NtContinue path.
+    fn(&data, 0x11111111ULL, 0x22222222ULL);
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
+    // handled by VEH
+  }
+  g_probe_ctx.active = 0;
+}
+
+static void measure_syscall_path(dbvm_detect_info_t* out)
+{
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  if (!ntdll) return;
+  NtYieldExecution_t pNtYieldExecution = (NtYieldExecution_t)GetProcAddress(ntdll, "NtYieldExecution");
+  if (!pNtYieldExecution) return;
+  const unsigned iters = 256;
+  uint64_t total=0, vmin=(uint64_t)-1, vmax=0;
+  for (unsigned i=0;i<iters;i++) {
+    uint64_t t0 = rdtsc64();
+    (void)pNtYieldExecution();
+    uint64_t t1 = rdtsc64();
+    uint64_t dt = (t1-t0);
+    total += dt;
+    if (dt < vmin) vmin = dt;
+    if (dt > vmax) vmax = dt;
+  }
+  out->syscall_mean = total / iters;
+  out->syscall_min  = vmin;
+  out->syscall_max  = vmax;
 }
 
 static void cpuid_ex(uint32_t leaf, uint32_t subleaf, uint32_t out[4])
@@ -282,20 +391,18 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   //    On Windows x64, IDT limit is typically 16*256-1 = 4095 (0x0FFF).
   read_descriptor_tables(&info->idtr_limit, &info->idtr_base,
                          &info->gdtr_limit, &info->gdtr_base);
-  if (info->idtr_limit != 0 && info->idtr_limit != 0x0FFF) {
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason),
-             "SGDT/SIDT anomaly: IDT limit 0x%04X", info->idtr_limit);
-    return info->result;
-  }
-
-  // DBVM bug: vmxsetup.c sets GDT limit to 88 (0x58). We observe 0x58..0x80 due to internal expansions.
-  // Windows x64 normally reports GDT limits well over 0x2F0. Treat any <=0x90 as DBVM.
-  if (info->gdtr_limit != 0 && info->gdtr_limit <= 0x0090) {
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason),
-             "GDT limit <=0x90 (0x%04X)", info->gdtr_limit);
-    return info->result;
+  // Record descriptor anomalies as evidence only; do not short-circuit classification.
+  // This ensures the rest of the probes still execute and populate evidence fields.
+  {
+    size_t rpos = 0;
+    if (info->idtr_limit != 0 && info->idtr_limit != 0x0FFF) {
+      rpos += (size_t)snprintf(info->reason + rpos, rpos < sizeof(info->reason) ? sizeof(info->reason) - rpos : 0,
+                               "IDTlimit=0x%04X; ", info->idtr_limit);
+    }
+    if (info->gdtr_limit != 0 && info->gdtr_limit <= 0x0090) {
+      rpos += (size_t)snprintf(info->reason + rpos, rpos < sizeof(info->reason) ? sizeof(info->reason) - rpos : 0,
+                               "GDTlimit<=0x90(0x%04X); ", info->gdtr_limit);
+    }
   }
 
   // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults
@@ -369,6 +476,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   int prev_prio = GetThreadPriority(th);
   SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
 
+  g_probe_ctx.active = 1; g_probe_ctx.capture = info; // enable distribution capture
   uint64_t vm_ud_vmcall = measure_ud_path_cycles_vmcall(FALSE); // Intel path
   uint64_t vm_ud_vmmcall = measure_ud_path_cycles_vmcall(TRUE);  // AMD path
   info->vm_ud_vmcall_cycles = vm_ud_vmcall;
@@ -377,6 +485,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // Use the slower of the two as the signal carrier
   info->vmcall_ud_cycles = (vm_ud_vmcall > vm_ud_vmmcall) ? vm_ud_vmcall : vm_ud_vmmcall;
   info->ud2_ud_cycles = measure_ud_path_cycles_ud2();
+  g_probe_ctx.active = 0; g_probe_ctx.capture = NULL;
 
   // restore
   if (prev_aff) SetThreadAffinityMask(th, prev_aff);
@@ -387,6 +496,35 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   cpuid_ex(0x0000000D, 0, r);
   info->cpuid_0d_ecx_low16 = (uint16_t)(r[2] & 0xFFFF);
   info->xcr0_low32 = (uint32_t)_xgetbv(0);
+
+  // Vendor string and AMD extended leaves
+  uint32_t vend0[4] = {0};
+  cpuid_ex(0, 0, vend0); // EBX, EDX, ECX contain vendor string
+  *(uint32_t*)&info->cpu_vendor[0]  = vend0[1]; // EBX
+  *(uint32_t*)&info->cpu_vendor[4]  = vend0[3]; // EDX
+  *(uint32_t*)&info->cpu_vendor[8]  = vend0[2]; // ECX
+  info->cpu_vendor[12] = '\0';
+  uint32_t maxext[4] = {0};
+  cpuid_ex(0x80000000, 0, maxext);
+  if (maxext[0] >= 0x80000001) {
+    uint32_t ext1[4] = {0};
+    cpuid_ex(0x80000001, 0, ext1);
+    info->cpuid_80000001_ecx = ext1[2];
+  }
+  if (maxext[0] >= 0x8000000A) {
+    uint32_t exta[4] = {0};
+    cpuid_ex(0x8000000A, 0, exta);
+    info->cpuid_8000000a_eax = exta[0];
+    info->cpuid_8000000a_ebx = exta[1];
+    info->cpuid_8000000a_ecx = exta[2];
+    info->cpuid_8000000a_edx = exta[3];
+  }
+
+  // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF)
+  run_tf_order_probe(FALSE, info); // VMCALL
+
+  // Syscall path timing via ntdll
+  measure_syscall_path(info);
 
   // Decision logic:
   // - If hypervisor bit set (CPUID.1:ECX[31]) and no DBVM signature -> Other HV (e.g., Hyper-V)

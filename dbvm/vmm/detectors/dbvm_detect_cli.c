@@ -38,6 +38,21 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("gdtr_base=0x%016llX\n", (unsigned long long)info->gdtr_base);
   printf("vmcall_rip_advance=%llu\n", (unsigned long long)info->vmcall_rip_advance);
   printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
+  if (info->tf_exc_count) {
+    printf("tf_exc_count=%u\n", info->tf_exc_count);
+    for (uint32_t i=0;i<info->tf_exc_count;i++) {
+      printf("tf_exc_%u_code=0x%08X tf_exc_%u_eflags=0x%08X\n", i, info->tf_exc_codes[i], i, info->tf_exc_eflags[i]);
+    }
+  }
+  printf("cpu_vendor=%s\n", info->cpu_vendor);
+  printf("cpuid_80000001_ecx=0x%08X\n", info->cpuid_80000001_ecx);
+  printf("cpuid_8000000a_eax=0x%08X\n", info->cpuid_8000000a_eax);
+  printf("cpuid_8000000a_ebx=0x%08X\n", info->cpuid_8000000a_ebx);
+  printf("cpuid_8000000a_ecx=0x%08X\n", info->cpuid_8000000a_ecx);
+  printf("cpuid_8000000a_edx=0x%08X\n", info->cpuid_8000000a_edx);
+  printf("syscall_mean=%llu\n", (unsigned long long)info->syscall_mean);
+  printf("syscall_min=%llu\n", (unsigned long long)info->syscall_min);
+  printf("syscall_max=%llu\n", (unsigned long long)info->syscall_max);
 }
 
 static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
@@ -57,7 +72,18 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"idtr_base\": %llu,\n", (unsigned long long)info->idtr_base);
   printf("  \"gdtr_base\": %llu,\n", (unsigned long long)info->gdtr_base);
   printf("  \"vmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmcall_rip_advance);
-  printf("  \"vmmcall_rip_advance\": %llu\n", (unsigned long long)info->vmmcall_rip_advance);
+  printf("  \"vmmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmmcall_rip_advance);
+  printf("  \"tf_exc\": [");
+  for (uint32_t i=0;i<info->tf_exc_count;i++) {
+    printf("{\"code\":%u,\"eflags\":%u}%s", info->tf_exc_codes[i], info->tf_exc_eflags[i], (i+1<info->tf_exc_count)?",":"");
+  }
+  printf("]\n");
+  printf(",  \"cpu_vendor\": \"%s\",\n", info->cpu_vendor);
+  printf("  \"cpuid_80000001_ecx\": %u,\n", info->cpuid_80000001_ecx);
+  printf("  \"cpuid_8000000a\": { \"eax\":%u, \"ebx\":%u, \"ecx\":%u, \"edx\":%u },\n",
+         info->cpuid_8000000a_eax, info->cpuid_8000000a_ebx, info->cpuid_8000000a_ecx, info->cpuid_8000000a_edx);
+  printf("  \"syscall\": { \"mean\":%llu, \"min\":%llu, \"max\":%llu }\n",
+         (unsigned long long)info->syscall_mean, (unsigned long long)info->syscall_min, (unsigned long long)info->syscall_max);
   printf("}\n");
 }
 

@@ -23,10 +23,17 @@ typedef struct {
   uint32_t dbvm_version;  // valid when result == DBVM_DETECT_DBVM_CONFIRMED
   uint32_t hv_vendor_leaf_present; // CPUID hypervisor-present bit
   char     reason[64];            // textual reason for final decision
+  char     cpu_vendor[13];        // CPUID vendor string
   uint64_t vmcall_ud_cycles;       // avg cycles max(vmcall,vmmcall)->#UD path
   uint64_t ud2_ud_cycles;          // avg cycles ud2->#UD path
   uint32_t cpuid_0d_ecx_low16;     // leaf 0x0D, subleaf 0, ECX low16
   uint32_t xcr0_low32;             // XGETBV(0) low 32
+  // AMD-only extended CPUID captures
+  uint32_t cpuid_80000001_ecx;     // SVM bit is ECX[2]
+  uint32_t cpuid_8000000a_eax;
+  uint32_t cpuid_8000000a_ebx;
+  uint32_t cpuid_8000000a_ecx;
+  uint32_t cpuid_8000000a_edx;
   uint8_t  used_vmmcall;           // 1 if AMD VMMCALL path used
   // Debug: individual measurements
   uint64_t vm_ud_vmcall_cycles;    // raw vmcall #UD avg cycles
@@ -38,6 +45,20 @@ typedef struct {
   uint64_t gdtr_base;
   uint64_t vmcall_rip_advance;     // bytes RIP advanced after #UD (intel path)
   uint64_t vmmcall_rip_advance;    // bytes RIP advanced after #UD (amd path)
+  // TF/#DB vs #UD sequencing
+  uint32_t tf_exc_count;           // number of exceptions captured (max 4)
+  uint32_t tf_exc_codes[4];        // ordered exception codes
+  uint32_t tf_exc_eflags[4];       // snapshot of EFLAGS for each exception (RF/TF bits)
+  uint8_t  tf_path_used_vmmcall;   // 1 if AMD VMMCALL path probed
+  // Timing distributions (basic)
+  uint64_t vmcall_ud_min;
+  uint64_t vmcall_ud_max;
+  uint64_t ud2_ud_min;
+  uint64_t ud2_ud_max;
+  // Syscall timing (via ntdll)
+  uint64_t syscall_mean;
+  uint64_t syscall_min;
+  uint64_t syscall_max;
 } dbvm_detect_info_t;
 
 // Runs detection. Fills info with measurements and decision.
