@@ -61,6 +61,22 @@ static void read_descriptor_tables(uint16_t* idt_lim, uint64_t* idt_base,
   if (gdt_base) *gdt_base = gdt.base;
 }
 
+static int sgdt_sidt_gueststyle_confirm(void)
+{
+  // Sample multiple times to avoid transient noise
+  int idt_guest_like = 0;
+  int gdt_guest_like = 0;
+  for (int i=0;i<8;i++) {
+    uint16_t idl=0, gdl=0; uint64_t ib=0, gb=0;
+    read_descriptor_tables(&idl, &ib, &gdl, &gb);
+    if (idl != 0 && idl != 0x0FFF && idl <= 0x0900) idt_guest_like++;
+    if (gdl != 0 && gdl <= 0x0090) gdt_guest_like++;
+    Sleep(0);
+  }
+  // Confirm only if both limits look guest-style in a majority of samples
+  return (idt_guest_like >= 5 && gdt_guest_like >= 5);
+}
+
 typedef struct _vmcall_basic {
   uint32_t size;      // must be >= 12
   uint32_t password2; // default 0xFEDCBA98
@@ -419,6 +435,38 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   return 1;
 }
 
+// Prefixed TF-first probe for password-free confirm
+static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_detect_info_t* out)
+{
+  unsigned char code[48]; size_t i=0;
+  // pushfq; or qword [rsp],0x100; popfq
+  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
+  // mov rax, rcx; mov rcx, r8
+  code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
+  unsigned char* insn = &code[i];
+  // prefix
+  code[i++] = prefix;
+  // vmcall / vmmcall
+  code[i++]=0x0F; code[i++]=0x01; code[i++]=(amd_vmmcall?0xD9:0xC1);
+  // ret
+  code[i++]=0xC3;
+  void* mem = VirtualAlloc(NULL, 64, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return 0;
+  memcpy(mem, code, i);
+  hv_call3_t fn = (hv_call3_t)mem;
+
+  g_probe_ctx.target_insn = ((unsigned char*)mem) + (insn - code);
+  g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 4;
+  g_probe_ctx.capture     = out; g_probe_ctx.active = 1; g_probe_ctx.max_records = 4;
+  out->tf_path_used_vmmcall = amd_vmmcall?1:0;
+  static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+  vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active = 0;
+  DWORD ok = (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
+  return ok ? 1 : 0;
+}
+
 // Probe prefixed variant for RIP advance
 // Prefixed variant probes disabled for now
 
@@ -670,11 +718,11 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // 1.b.2) Prefixed variant probes reserved for future hardening
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (default ON; can disable with DBVM_DISABLE_FAULT_SEM=1)
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (default DISABLED; enable with DBVM_ENABLE_FAULT_SEM=1)
   //      ACCESS_VIOLATION here strongly implicates a mediator mapping the pointer. Note: relies on default P1/P3.
   if (!no_vm) {
-    char disfs[8]; DWORD disfs_dw = GetEnvironmentVariableA("DBVM_DISABLE_FAULT_SEM", disfs, sizeof(disfs));
-    if (!(disfs_dw>0 && disfs[0]=='1')) {
+    char enfs[8]; DWORD enfs_dw = GetEnvironmentVariableA("DBVM_ENABLE_FAULT_SEM", enfs, sizeof(enfs));
+    if (enfs_dw>0 && enfs[0]=='1') {
       DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
       DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
       info->vmcall_fault_exc  = f_vm;
