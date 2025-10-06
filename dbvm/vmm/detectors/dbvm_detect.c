@@ -212,6 +212,60 @@ typedef struct timing_stats_s {
   uint64_t p99;
 } timing_stats_t;
 
+// Forward declarations for measurement helpers
+static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out);
+static void measure_ud_path_cycles_ud2(timing_stats_t* out);
+static void measure_syscall_path(dbvm_detect_info_t* out);
+
+static void run_measurements(dbvm_detect_info_t* info, int no_vm)
+{
+  // Measure UD path timing for vmcall/vmmcall vs ud2 and syscall timing
+  HANDLE th = GetCurrentThread();
+  DWORD_PTR prev_aff = SetThreadAffinityMask(th, 1);
+  int prev_prio = GetThreadPriority(th);
+  SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
+
+  g_probe_ctx.active = 0; g_probe_ctx.capture = NULL;
+  timing_stats_t vm_vmcall_stats = {0}, vm_vmmcall_stats = {0}, ud2_stats = {0};
+  uint64_t vm_ud_vmcall = 0, vm_ud_vmmcall = 0;
+  if (!no_vm) {
+    measure_ud_path_cycles_vmcall(FALSE, &vm_vmcall_stats);
+    measure_ud_path_cycles_vmcall(TRUE,  &vm_vmmcall_stats);
+    vm_ud_vmcall = vm_vmcall_stats.mean;
+    vm_ud_vmmcall = vm_vmmcall_stats.mean;
+  }
+  info->vm_ud_vmcall_cycles = vm_ud_vmcall;
+  info->vm_ud_vmmcall_cycles = vm_ud_vmmcall;
+  BOOL use_amd_path = (vm_ud_vmmcall >= vm_ud_vmcall);
+  info->vmcall_ud_cycles = use_amd_path ? vm_ud_vmmcall : vm_ud_vmcall;
+  if (use_amd_path) {
+    info->vmcall_ud_min = vm_vmmcall_stats.vmin;
+    info->vmcall_ud_max = vm_vmmcall_stats.vmax;
+    info->vmcall_p50    = vm_vmmcall_stats.p50;
+    info->vmcall_p90    = vm_vmmcall_stats.p90;
+    info->vmcall_p99    = vm_vmmcall_stats.p99;
+  } else {
+    info->vmcall_ud_min = vm_vmcall_stats.vmin;
+    info->vmcall_ud_max = vm_vmcall_stats.vmax;
+    info->vmcall_p50    = vm_vmcall_stats.p50;
+    info->vmcall_p90    = vm_vmcall_stats.p90;
+    info->vmcall_p99    = vm_vmcall_stats.p99;
+  }
+  measure_ud_path_cycles_ud2(&ud2_stats);
+  info->ud2_ud_cycles = ud2_stats.mean;
+  info->ud2_ud_min    = ud2_stats.vmin;
+  info->ud2_ud_max    = ud2_stats.vmax;
+  info->ud2_p50       = ud2_stats.p50;
+  info->ud2_p90       = ud2_stats.p90;
+  info->ud2_p99       = ud2_stats.p99;
+
+  // Syscall path timing
+  measure_syscall_path(info);
+
+  if (prev_aff) SetThreadAffinityMask(th, prev_aff);
+  if (prev_prio != THREAD_PRIORITY_ERROR_RETURN) SetThreadPriority(th, prev_prio);
+}
+
 static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
 {
   hv_call3_t fn = build_vm_ud_stub(amd_vmmcall);
@@ -548,6 +602,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   unsigned long long rax = 0;
   if (!no_vm) rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
   if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+    run_measurements(info, (int)no_vm);
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 0;
@@ -560,6 +615,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   ex = 0;
   if (!no_vm) rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
   if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+    run_measurements(info, (int)no_vm);
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 1;
@@ -572,6 +628,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   {
     BOOL used_vmmcall = 0; uint32_t ver=0;
     if (try_common_passwords(&used_vmmcall, &ver)) {
+      run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       info->dbvm_version = ver;
       info->used_vmmcall = used_vmmcall;
@@ -586,6 +643,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   if (!no_vm && detect_vmcall_rip_advance(FALSE, &adv_vm)) {
     info->vmcall_rip_advance = adv_vm;
     if (adv_vm >= 3) {
+      run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       snprintf(info->reason, sizeof(info->reason),
                "#UD RIP advance %llu on VMCALL", (unsigned long long)adv_vm);
@@ -595,6 +653,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   if (!no_vm && detect_vmcall_rip_advance(TRUE, &adv_vmm)) {
     info->vmmcall_rip_advance = adv_vmm;
     if (adv_vmm >= 3) {
+      run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       info->used_vmmcall = 1;
       snprintf(info->reason, sizeof(info->reason),
@@ -613,6 +672,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       info->vmcall_fault_exc  = f_vm;
       info->vmmcall_fault_exc = f_vmm;
       if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
+        run_measurements(info, (int)no_vm);
         info->result = DBVM_DETECT_DBVM_CONFIRMED;
         snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
         return info->result;
@@ -623,55 +683,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // 2) Password-agnostic side-channels
   info->hv_vendor_leaf_present = (uint32_t)hypervisor_present_bit();
 
-  // Measure UD path timing for vmcall/vmmcall vs ud2
-  // Bind thread to a single core to reduce jitter
-  HANDLE th = GetCurrentThread();
-  DWORD_PTR prev_aff = SetThreadAffinityMask(th, 1);
-  int prev_prio = GetThreadPriority(th);
-  SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
-
-  g_probe_ctx.active = 0; // distribution now reported via stats structs below
-  g_probe_ctx.capture = NULL;
-  timing_stats_t vm_vmcall_stats = {0}, vm_vmmcall_stats = {0}, ud2_stats = {0};
-  uint64_t vm_ud_vmcall = 0, vm_ud_vmmcall = 0;
-  if (!no_vm) {
-    measure_ud_path_cycles_vmcall(FALSE, &vm_vmcall_stats); // Intel path
-    measure_ud_path_cycles_vmcall(TRUE,  &vm_vmmcall_stats);  // AMD path
-    vm_ud_vmcall = vm_vmcall_stats.mean;
-    vm_ud_vmmcall = vm_vmmcall_stats.mean;
-  }
-  info->vm_ud_vmcall_cycles = vm_ud_vmcall;
-  info->vm_ud_vmmcall_cycles = vm_ud_vmmcall;
-
-  // Use the slower of the two as the signal carrier
-  BOOL use_amd_path = (vm_ud_vmmcall >= vm_ud_vmcall);
-  info->vmcall_ud_cycles = use_amd_path ? vm_ud_vmmcall : vm_ud_vmcall;
-  // fill distribution for the chosen path
-  if (use_amd_path) {
-    info->vmcall_ud_min = vm_vmmcall_stats.vmin;
-    info->vmcall_ud_max = vm_vmmcall_stats.vmax;
-    info->vmcall_p50    = vm_vmmcall_stats.p50;
-    info->vmcall_p90    = vm_vmmcall_stats.p90;
-    info->vmcall_p99    = vm_vmmcall_stats.p99;
-  } else {
-    info->vmcall_ud_min = vm_vmcall_stats.vmin;
-    info->vmcall_ud_max = vm_vmcall_stats.vmax;
-    info->vmcall_p50    = vm_vmcall_stats.p50;
-    info->vmcall_p90    = vm_vmcall_stats.p90;
-    info->vmcall_p99    = vm_vmcall_stats.p99;
-  }
-
-  measure_ud_path_cycles_ud2(&ud2_stats);
-  info->ud2_ud_cycles = ud2_stats.mean;
-  info->ud2_ud_min    = ud2_stats.vmin;
-  info->ud2_ud_max    = ud2_stats.vmax;
-  info->ud2_p50       = ud2_stats.p50;
-  info->ud2_p90       = ud2_stats.p90;
-  info->ud2_p99       = ud2_stats.p99;
-
-  // restore
-  if (prev_aff) SetThreadAffinityMask(th, prev_aff);
-  if (prev_prio != THREAD_PRIORITY_ERROR_RETURN) SetThreadPriority(th, prev_prio);
+  // Perform measurements (always, to populate telemetry even if a confirm occurs)
+  run_measurements(info, (int)no_vm);
 
   // CPUID 0x0D, subleaf 0 and XGETBV(0)
   uint32_t r[4]={0};
