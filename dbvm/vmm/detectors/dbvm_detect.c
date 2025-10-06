@@ -64,6 +64,32 @@ static unsigned long long try_vmcall_getversion(BOOL amd_vmmcall, unsigned long 
   return rax;
 }
 
+static int try_common_passwords(BOOL* out_used_vmmcall, uint32_t* out_version)
+{
+  // Attempt a small dictionary of common Password2 variants while keeping P1/P3 defaults.
+  // Observed in the field: 0xFEDCBA98 (stock), CE-themed variants used by custom builds.
+  const unsigned long p2_candidates[] = {
+    0xFEDCBA98UL,
+    0x00CE0000UL,
+    0xCE000000UL,
+    0x00CE00CEUL,
+    0xCE00CE00UL
+  };
+
+  for (int vmm=0; vmm<2; vmm++) {
+    for (size_t i=0;i<sizeof(p2_candidates)/sizeof(p2_candidates[0]);i++) {
+      DWORD ex=0;
+      unsigned long long rax = try_vmcall_getversion(vmm?TRUE:FALSE, DBVM_P1, DBVM_P3, p2_candidates[i], &ex);
+      if (ex==0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+        if (out_used_vmmcall) *out_used_vmmcall = (vmm?1:0);
+        if (out_version) *out_version = (uint32_t)(rax & 0x00FFFFFFULL);
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
 static unsigned long long rdtsc64(void)
 {
   return __rdtsc();
@@ -95,7 +121,7 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
   if (!fn) return 0;
 
   // Intentionally wrong passwords (so DBVM injects #UD). On bare metal, this is also #UD.
-  const unsigned iters = 64; // keep modest, exceptions are expensive
+  const unsigned iters = 256; // more samples for stability
   uint64_t total = 0, ok=0;
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
@@ -149,6 +175,15 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   if (!info) return DBVM_DETECT_INDETERMINATE;
   memset(info, 0, sizeof(*info));
 
+  // Optional tuning: DBVM_SUSPECT_THRESHOLD_PCT (default 12)
+  int threshold_pct = 12;
+  char envbuf[32];
+  DWORD n = GetEnvironmentVariableA("DBVM_SUSPECT_THRESHOLD_PCT", envbuf, sizeof(envbuf));
+  if (n>0 && n < sizeof(envbuf)) {
+    int p = atoi(envbuf);
+    if (p >= 5 && p <= 100) threshold_pct = p;
+  }
+
   // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults
   DWORD ex = 0;
 
@@ -171,15 +206,39 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     return info->result;
   }
 
+  // Try a small dictionary of common password2 variants
+  {
+    BOOL used_vmmcall = 0; uint32_t ver=0;
+    if (try_common_passwords(&used_vmmcall, &ver)) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      info->dbvm_version = ver;
+      info->used_vmmcall = used_vmmcall;
+      return info->result;
+    }
+  }
+
   // 2) Password-agnostic side-channels
   info->hv_vendor_leaf_present = (uint32_t)hypervisor_present_bit();
 
   // Measure UD path timing for vmcall/vmmcall vs ud2
+  // Bind thread to a single core to reduce jitter
+  HANDLE th = GetCurrentThread();
+  DWORD_PTR prev_aff = SetThreadAffinityMask(th, 1);
+  int prev_prio = GetThreadPriority(th);
+  SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
+
   uint64_t vm_ud_vmcall = measure_ud_path_cycles_vmcall(FALSE); // Intel path
   uint64_t vm_ud_vmmcall = measure_ud_path_cycles_vmcall(TRUE);  // AMD path
-  info->vmcall_ud_cycles = (vm_ud_vmcall && vm_ud_vmmcall) ? (vm_ud_vmcall < vm_ud_vmmcall ? vm_ud_vmcall : vm_ud_vmmcall)
-                                                           : (vm_ud_vmcall ? vm_ud_vmcall : vm_ud_vmmcall);
+  info->vm_ud_vmcall_cycles = vm_ud_vmcall;
+  info->vm_ud_vmmcall_cycles = vm_ud_vmmcall;
+
+  // Use the slower of the two as the signal carrier
+  info->vmcall_ud_cycles = (vm_ud_vmcall > vm_ud_vmmcall) ? vm_ud_vmcall : vm_ud_vmmcall;
   info->ud2_ud_cycles = measure_ud_path_cycles_ud2();
+
+  // restore
+  if (prev_aff) SetThreadAffinityMask(th, prev_aff);
+  if (prev_prio != THREAD_PRIORITY_ERROR_RETURN) SetThreadPriority(th, prev_prio);
 
   // CPUID 0x0D, subleaf 0 and XGETBV(0)
   uint32_t r[4]={0};
@@ -197,7 +256,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // - If vmcall-UD avg cycles >> ud2-UD cycles (e.g., >2x), very strong indication that
   //   a ring -1 handler dispatched VMCALL and injected #UD (DBVM behavior), while still
   //   hiding the hypervisor-present bit.
-  if (info->vmcall_ud_cycles && info->ud2_ud_cycles && info->vmcall_ud_cycles > (info->ud2_ud_cycles * 2)) {
+  // empirical: DBVM adds consistent overhead; use a conservative 12% threshold
+  if (info->vmcall_ud_cycles && info->ud2_ud_cycles && info->vmcall_ud_cycles * 100 > info->ud2_ud_cycles * threshold_pct) {
     info->result = DBVM_DETECT_SUSPECT_DBVM;
     return info->result;
   }

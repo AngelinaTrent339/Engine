@@ -60,6 +60,11 @@ int main(int argc, char** argv)
 
   if (json) print_json(&info, r);
   else      print_text(&info, r);
+  // Debug raw channels
+  if (!json) {
+    printf("vm_ud_vmcall_cycles=%llu\n", (unsigned long long)info.vm_ud_vmcall_cycles);
+    printf("vm_ud_vmmcall_cycles=%llu\n", (unsigned long long)info.vm_ud_vmmcall_cycles);
+  }
   fflush(stdout);
 
   // If launched without a console (double-click), show a message box so the window doesn't just disappear
