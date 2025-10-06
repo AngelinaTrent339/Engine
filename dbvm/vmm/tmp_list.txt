@@ -1,0 +1,8 @@
+docs\\vmcall.txt
+vmcall.c
+vmma.asm
+main.c
+test.h
+vmxsetup.c
+vmcall.h
+commona.asm
