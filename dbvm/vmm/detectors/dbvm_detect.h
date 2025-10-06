@@ -22,7 +22,7 @@ typedef struct {
   dbvm_detect_result_t result;
   uint32_t dbvm_version;  // valid when result == DBVM_DETECT_DBVM_CONFIRMED
   uint32_t hv_vendor_leaf_present; // CPUID hypervisor-present bit
-  char     reason[64];            // textual reason for final decision
+  char     reason[192];           // textual reason for final decision (expanded)
   char     cpu_vendor[13];        // CPUID vendor string
   uint64_t vmcall_ud_cycles;       // avg cycles max(vmcall,vmmcall)->#UD path
   uint64_t ud2_ud_cycles;          // avg cycles ud2->#UD path

@@ -16,6 +16,9 @@ struct probe_ctx_s {
 };
 extern struct probe_ctx_s g_probe_ctx;
 
+// Forward decls used before their definitions
+static void cpuid_ex(uint32_t leaf, uint32_t subleaf, uint32_t out[4]);
+
 // ---- SGDT / SIDT helpers (user-mode safe) ----
 typedef void (WINAPI *sidt_fn_t)(void* out);
 typedef void (WINAPI *sgdt_fn_t)(void* out);
@@ -492,6 +495,35 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
+  // 0.b) Collect CPUID/XGETBV and vendor string early so they are present even if we confirm early later
+  {
+    uint32_t vend0[4] = {0};
+    cpuid_ex(0, 0, vend0); // EBX, EDX, ECX contain vendor string
+    *(uint32_t*)&info->cpu_vendor[0]  = vend0[1]; // EBX
+    *(uint32_t*)&info->cpu_vendor[4]  = vend0[3]; // EDX
+    *(uint32_t*)&info->cpu_vendor[8]  = vend0[2]; // ECX
+    info->cpu_vendor[12] = '\0';
+    // CPUID 0x0D, XCR0
+    uint32_t r0d[4] = {0};
+    cpuid_ex(0x0000000D, 0, r0d);
+    info->cpuid_0d_ecx_low16 = (uint16_t)(r0d[2] & 0xFFFF);
+    info->xcr0_low32 = (uint32_t)_xgetbv(0);
+    // AMD extended leaves
+    uint32_t maxext[4] = {0};
+    cpuid_ex(0x80000000, 0, maxext);
+    if (maxext[0] >= 0x80000001) {
+      uint32_t ext1[4] = {0}; cpuid_ex(0x80000001, 0, ext1);
+      info->cpuid_80000001_ecx = ext1[2];
+    }
+    if (maxext[0] >= 0x8000000A) {
+      uint32_t exta[4] = {0}; cpuid_ex(0x8000000A, 0, exta);
+      info->cpuid_8000000a_eax = exta[0];
+      info->cpuid_8000000a_ebx = exta[1];
+      info->cpuid_8000000a_ecx = exta[2];
+      info->cpuid_8000000a_edx = exta[3];
+    }
+  }
+
   // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults (optional, can be skipped)
   DWORD ex = 0;
   char no_vm_env[8]; DWORD no_vm = GetEnvironmentVariableA("DBVM_NO_VM", no_vm_env, sizeof(no_vm_env));
@@ -555,17 +587,20 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (always record; confirm only on ACCESS_VIOLATION)
-  //      ACCESS_VIOLATION here is a strong DBVM signature, as DBVM reads guest memory before validating passwords
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (opt-in, gated by DBVM_USE_FAULT_SEM=1)
+  //      ACCESS_VIOLATION here strongly implicates a mediator handling and mapping the pointer. Requires default P1/P3.
   if (!no_vm) {
-    DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
-    DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
-    info->vmcall_fault_exc  = f_vm;
-    info->vmmcall_fault_exc = f_vmm;
-    if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
-      return info->result;
+    char usefs[8]; DWORD usefs_dw = GetEnvironmentVariableA("DBVM_USE_FAULT_SEM", usefs, sizeof(usefs));
+    if (usefs_dw>0 && usefs[0]=='1') {
+      DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
+      DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
+      info->vmcall_fault_exc  = f_vm;
+      info->vmmcall_fault_exc = f_vmm;
+      if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
+        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+        snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
+        return info->result;
+      }
     }
   }
 
