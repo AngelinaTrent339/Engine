@@ -22,6 +22,8 @@ static const char* result_to_str(dbvm_detect_result_t r)
 static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
 {
   printf("result=%s\n", result_to_str(r));
+  if (info->reason[0])
+    printf("reason=%s\n", info->reason);
   if (r == DBVM_DETECT_DBVM_CONFIRMED)
     printf("dbvm_version=0x%06X\n", info->dbvm_version);
   printf("hv_present_bit=%u\n", info->hv_vendor_leaf_present);
@@ -32,6 +34,8 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("used_vmmcall=%u\n", info->used_vmmcall);
   printf("idtr_limit=0x%04X\n", info->idtr_limit);
   printf("gdtr_limit=0x%04X\n", info->gdtr_limit);
+  printf("idtr_base=0x%016llX\n", (unsigned long long)info->idtr_base);
+  printf("gdtr_base=0x%016llX\n", (unsigned long long)info->gdtr_base);
   printf("vmcall_rip_advance=%llu\n", (unsigned long long)info->vmcall_rip_advance);
   printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
 }
@@ -40,6 +44,7 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
 {
   printf("{\n");
   printf("  \"result\": \"%s\",\n", result_to_str(r));
+  printf("  \"reason\": \"%s\",\n", info->reason);
   printf("  \"dbvm_version\": %u,\n", info->dbvm_version);
   printf("  \"hv_present_bit\": %u,\n", info->hv_vendor_leaf_present);
   printf("  \"vmcall_ud_cycles\": %llu,\n", (unsigned long long)info->vmcall_ud_cycles);
@@ -49,6 +54,8 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"used_vmmcall\": %u,\n", info->used_vmmcall);
   printf("  \"idtr_limit\": %u,\n", (unsigned)info->idtr_limit);
   printf("  \"gdtr_limit\": %u,\n", (unsigned)info->gdtr_limit);
+  printf("  \"idtr_base\": %llu,\n", (unsigned long long)info->idtr_base);
+  printf("  \"gdtr_base\": %llu,\n", (unsigned long long)info->gdtr_base);
   printf("  \"vmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmcall_rip_advance);
   printf("  \"vmmcall_rip_advance\": %llu\n", (unsigned long long)info->vmmcall_rip_advance);
   printf("}\n");

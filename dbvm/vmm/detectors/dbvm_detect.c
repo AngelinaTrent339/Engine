@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <intrin.h>
 #include <string.h>
+#include <stdio.h>
 
 // ---- SGDT / SIDT helpers (user-mode safe) ----
 typedef void (WINAPI *sidt_fn_t)(void* out);
@@ -33,7 +34,8 @@ static sgdt_fn_t build_sgdt_stub(void)
   return (sgdt_fn_t)mem;
 }
 
-static void read_descriptor_tables(uint16_t* idt_lim, uint16_t* gdt_lim)
+static void read_descriptor_tables(uint16_t* idt_lim, uint64_t* idt_base,
+                                   uint16_t* gdt_lim, uint64_t* gdt_base)
 {
   desc_ptr_t idt = {0}, gdt = {0};
   sidt_fn_t sidtfn = build_sidt_stub();
@@ -41,7 +43,9 @@ static void read_descriptor_tables(uint16_t* idt_lim, uint16_t* gdt_lim)
   if (sidtfn) sidtfn(&idt);
   if (sgdtfn) sgdtfn(&gdt);
   if (idt_lim) *idt_lim = idt.limit;
+  if (idt_base) *idt_base = idt.base;
   if (gdt_lim) *gdt_lim = gdt.limit;
+  if (gdt_base) *gdt_base = gdt.base;
 }
 
 typedef struct _vmcall_basic {
@@ -276,9 +280,12 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // 0) Descriptor-table signature check (DBVM bug present in this source)
   //    vmxsetup.c sets guest IDT limit to 8*256 and GDT limit to 88, not size-1.
   //    On Windows x64, IDT limit is typically 16*256-1 = 4095 (0x0FFF).
-  read_descriptor_tables(&info->idtr_limit, &info->gdtr_limit);
+  read_descriptor_tables(&info->idtr_limit, &info->idtr_base,
+                         &info->gdtr_limit, &info->gdtr_base);
   if (info->idtr_limit != 0 && info->idtr_limit != 0x0FFF) {
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason),
+             "SGDT/SIDT anomaly: IDT limit 0x%04X", info->idtr_limit);
     return info->result;
   }
 
@@ -286,6 +293,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // Windows x64 normally reports GDT limits well over 0x2F0. Treat any <=0x90 as DBVM.
   if (info->gdtr_limit != 0 && info->gdtr_limit <= 0x0090) {
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason),
+             "GDT limit <=0x90 (0x%04X)", info->gdtr_limit);
     return info->result;
   }
 
@@ -298,6 +307,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 0;
+    snprintf(info->reason, sizeof(info->reason),
+             "VMCALL GetVersion RAX=0x%llX", rax);
     return info->result;
   }
 
@@ -308,6 +319,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 1;
+    snprintf(info->reason, sizeof(info->reason),
+             "VMMCALL GetVersion RAX=0x%llX", rax);
     return info->result;
   }
 
@@ -318,6 +331,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       info->dbvm_version = ver;
       info->used_vmmcall = used_vmmcall;
+      snprintf(info->reason, sizeof(info->reason),
+               "GetVersion dictionary hit (P2 variant)");
       return info->result;
     }
   }
@@ -328,6 +343,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     info->vmcall_rip_advance = adv_vm;
     if (adv_vm >= 3) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason),
+               "#UD RIP advance %llu on VMCALL", (unsigned long long)adv_vm);
       return info->result;
     }
   }
@@ -336,6 +353,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     if (adv_vmm >= 3) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       info->used_vmmcall = 1;
+      snprintf(info->reason, sizeof(info->reason),
+               "#UD RIP advance %llu on VMMCALL", (unsigned long long)adv_vmm);
       return info->result;
     }
   }
@@ -373,6 +392,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // - If hypervisor bit set (CPUID.1:ECX[31]) and no DBVM signature -> Other HV (e.g., Hyper-V)
   if (info->hv_vendor_leaf_present) {
     info->result = DBVM_DETECT_OTHER_HV;
+    snprintf(info->reason, sizeof(info->reason),
+             "CPUID hypervisor-present bit set");
     return info->result;
   }
 
@@ -382,6 +403,10 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // empirical: DBVM adds consistent overhead; use a conservative 12% threshold
   if (info->vmcall_ud_cycles && info->ud2_ud_cycles && info->vmcall_ud_cycles * 100 > info->ud2_ud_cycles * threshold_pct) {
     info->result = DBVM_DETECT_SUSPECT_DBVM;
+    snprintf(info->reason, sizeof(info->reason),
+             "VMCALL#UD avg %llu vs UD2 %llu (>%d%%)",
+             (unsigned long long)info->vmcall_ud_cycles,
+             (unsigned long long)info->ud2_ud_cycles, threshold_pct);
     return info->result;
   }
 
@@ -392,11 +417,14 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     unsigned x = info->xcr0_low32 & 0x7;
     if (x == 0x3 || x == 0x7) { // common OS-enable masks
       info->result = DBVM_DETECT_SUSPECT_DBVM;
+      snprintf(info->reason, sizeof(info->reason),
+               "CPUID(0x0D) ECX low16=0x6691 (patched)");
       return info->result;
     }
   }
 
   // If nothing conclusive
   info->result = DBVM_DETECT_NO_HV;
+  snprintf(info->reason, sizeof(info->reason), "No DBVM indicators detected");
   return info->result;
 }

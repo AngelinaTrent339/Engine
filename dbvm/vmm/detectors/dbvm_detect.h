@@ -22,6 +22,7 @@ typedef struct {
   dbvm_detect_result_t result;
   uint32_t dbvm_version;  // valid when result == DBVM_DETECT_DBVM_CONFIRMED
   uint32_t hv_vendor_leaf_present; // CPUID hypervisor-present bit
+  char     reason[64];            // textual reason for final decision
   uint64_t vmcall_ud_cycles;       // avg cycles max(vmcall,vmmcall)->#UD path
   uint64_t ud2_ud_cycles;          // avg cycles ud2->#UD path
   uint32_t cpuid_0d_ecx_low16;     // leaf 0x0D, subleaf 0, ECX low16
@@ -33,6 +34,8 @@ typedef struct {
   // Descriptor table snapshots
   uint16_t idtr_limit;             // SIDT limit (expect ~0x0FFF on Win x64)
   uint16_t gdtr_limit;             // SGDT limit (OS-dependent, but never 0x0058)
+  uint64_t idtr_base;
+  uint64_t gdtr_base;
   uint64_t vmcall_rip_advance;     // bytes RIP advanced after #UD (intel path)
   uint64_t vmmcall_rip_advance;    // bytes RIP advanced after #UD (amd path)
 } dbvm_detect_info_t;
