@@ -29,6 +29,8 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("hv_present_bit=%u\n", info->hv_vendor_leaf_present);
   printf("vmcall_ud_cycles=%llu\n", (unsigned long long)info->vmcall_ud_cycles);
   printf("ud2_ud_cycles=%llu\n", (unsigned long long)info->ud2_ud_cycles);
+  printf("vmcall_ud_min=%llu vmcall_ud_max=%llu\n", (unsigned long long)info->vmcall_ud_min, (unsigned long long)info->vmcall_ud_max);
+  printf("ud2_ud_min=%llu ud2_ud_max=%llu\n", (unsigned long long)info->ud2_ud_min, (unsigned long long)info->ud2_ud_max);
   printf("cpuid_0d_ecx_low16=0x%04X\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("xcr0_low32=0x%08X\n", (unsigned)info->xcr0_low32);
   printf("used_vmmcall=%u\n", info->used_vmmcall);
@@ -64,6 +66,8 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"hv_present_bit\": %u,\n", info->hv_vendor_leaf_present);
   printf("  \"vmcall_ud_cycles\": %llu,\n", (unsigned long long)info->vmcall_ud_cycles);
   printf("  \"ud2_ud_cycles\": %llu,\n", (unsigned long long)info->ud2_ud_cycles);
+  printf("  \"vmcall_ud_min\": %llu, \"vmcall_ud_max\": %llu,\n", (unsigned long long)info->vmcall_ud_min, (unsigned long long)info->vmcall_ud_max);
+  printf("  \"ud2_ud_min\": %llu, \"ud2_ud_max\": %llu,\n", (unsigned long long)info->ud2_ud_min, (unsigned long long)info->ud2_ud_max);
   printf("  \"cpuid_0d_ecx_low16\": %u,\n", (unsigned)info->cpuid_0d_ecx_low16);
   printf("  \"xcr0_low32\": %u,\n", (unsigned)info->xcr0_low32);
   printf("  \"used_vmmcall\": %u,\n", info->used_vmmcall);
@@ -91,16 +95,38 @@ int main(int argc, char** argv)
 {
   int pause_after = 0;
   int json = 0;
+  int policy_mode = 0;
+  int policy_threshold = 60; // percent over UD2 mean
+  int no_vm = 0;
   for (int i=1;i<argc;i++) {
     if (_stricmp(argv[i], "--pause")==0) pause_after=1;
     else if (_stricmp(argv[i], "--json")==0) json=1;
+    else if (_stricmp(argv[i], "--policy")==0) policy_mode=1;
+    else if (_strnicmp(argv[i], "--policy-threshold=", 20)==0) {
+      int v = atoi(argv[i]+20);
+      if (v>=10 && v<=300) policy_threshold=v;
+    }
+    else if (_stricmp(argv[i], "--no-vm")==0) no_vm=1;
   }
+
+  if (no_vm) SetEnvironmentVariableA("DBVM_NO_VM", "1");
 
   dbvm_detect_info_t info;
   dbvm_detect_result_t r = dbvm_detect_run(&info);
 
   if (json) print_json(&info, r);
   else      print_text(&info, r);
+  if (policy_mode && !json) {
+    int likely = 0;
+    double ud2 = (double) (info.ud2_ud_cycles ? info.ud2_ud_cycles : 1);
+    double vmc = (double) info.vmcall_ud_cycles;
+    double ratio = vmc / ud2;
+    if (info.hv_vendor_leaf_present==0 && vmc >= (ud2 * (1.0 + (policy_threshold/100.0))))
+      likely = 1;
+    const char* arch = ( _stricmp(info.cpu_vendor, "AuthenticAMD")==0 ? "AMD" : (_stricmp(info.cpu_vendor, "GenuineIntel")==0?"INTEL":"OTHER") );
+    printf("policy=%s ratio=%.2f threshold=%d%%\n", likely?"LIKELY_DBVM":"NO_DBVM", ratio, policy_threshold);
+    printf("policy_arch=%s\n", arch);
+  }
   // Debug raw channels
   if (!json) {
     printf("vm_ud_vmcall_cycles=%llu\n", (unsigned long long)info.vm_ud_vmcall_cycles);

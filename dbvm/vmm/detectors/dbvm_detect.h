@@ -55,10 +55,16 @@ typedef struct {
   uint64_t vmcall_ud_max;
   uint64_t ud2_ud_min;
   uint64_t ud2_ud_max;
+  // Timing percentiles
+  uint64_t vmcall_p50, vmcall_p90, vmcall_p99;
+  uint64_t ud2_p50,    ud2_p90,    ud2_p99;
   // Syscall timing (via ntdll)
   uint64_t syscall_mean;
   uint64_t syscall_min;
   uint64_t syscall_max;
+  uint64_t syscall2_mean; // NtQuerySystemTime
+  uint64_t syscall2_min;
+  uint64_t syscall2_max;
 } dbvm_detect_info_t;
 
 // Runs detection. Fills info with measurements and decision.

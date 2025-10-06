@@ -76,6 +76,7 @@ static const unsigned long      DBVM_P2 = 0xFEDCBA98UL;          // struct field
 // Returns with RAX preserved from the hypercall handler.
 typedef unsigned long long (WINAPI *hv_call3_t)(void* data, unsigned long long pass1, unsigned long long pass3);
 typedef LONG (NTAPI *NtYieldExecution_t)(VOID);
+typedef LONG (NTAPI *NtQuerySystemTime_t)(PLARGE_INTEGER);
 
 static hv_call3_t build_vm_stub(BOOL amd_vmmcall)
 {
@@ -178,6 +179,7 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
   const unsigned iters = 256; // more samples for stability
   uint64_t total = 0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
+  uint64_t samples[256]; unsigned sc=0;
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     unsigned long long t0 = rdtsc64();
@@ -191,12 +193,19 @@ static uint64_t measure_ud_path_cycles_vmcall(BOOL amd_vmmcall)
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
+    if (sc<256) samples[sc++]=dt;
   }
   // record distribution in global info via probe context if available
   if (g_probe_ctx.active && g_probe_ctx.capture) {
     if (!amd_vmmcall) {
       g_probe_ctx.capture->vmcall_ud_min = vmin;
       g_probe_ctx.capture->vmcall_ud_max = vmax;
+      // percentiles
+      // simple insertion sort for small array
+      for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
+      g_probe_ctx.capture->vmcall_p50 = samples[sc*50/100];
+      g_probe_ctx.capture->vmcall_p90 = samples[sc*90/100];
+      g_probe_ctx.capture->vmcall_p99 = samples[sc*99/100];
     }
   }
   return ok ? (total / ok) : 0;
@@ -209,6 +218,7 @@ static uint64_t measure_ud_path_cycles_ud2(void)
   const unsigned iters = 64;
   uint64_t total=0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
+  uint64_t samples[64]; unsigned sc=0;
   for (unsigned i=0;i<iters;i++) {
     unsigned long long t0 = rdtsc64();
     __try {
@@ -221,10 +231,15 @@ static uint64_t measure_ud_path_cycles_ud2(void)
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
+    if (sc<64) samples[sc++]=dt;
   }
   if (g_probe_ctx.active && g_probe_ctx.capture) {
     g_probe_ctx.capture->ud2_ud_min = vmin;
     g_probe_ctx.capture->ud2_ud_max = vmax;
+    for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
+    g_probe_ctx.capture->ud2_p50 = samples[sc*50/100];
+    g_probe_ctx.capture->ud2_p90 = samples[sc*90/100];
+    g_probe_ctx.capture->ud2_p99 = samples[sc*99/100];
   }
   return ok ? (total / ok) : 0;
 }
@@ -341,6 +356,7 @@ static void measure_syscall_path(dbvm_detect_info_t* out)
   HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
   if (!ntdll) return;
   NtYieldExecution_t pNtYieldExecution = (NtYieldExecution_t)GetProcAddress(ntdll, "NtYieldExecution");
+  NtQuerySystemTime_t pNtQuerySystemTime = (NtQuerySystemTime_t)GetProcAddress(ntdll, "NtQuerySystemTime");
   if (!pNtYieldExecution) return;
   const unsigned iters = 256;
   uint64_t total=0, vmin=(uint64_t)-1, vmax=0;
@@ -356,6 +372,14 @@ static void measure_syscall_path(dbvm_detect_info_t* out)
   out->syscall_mean = total / iters;
   out->syscall_min  = vmin;
   out->syscall_max  = vmax;
+  if (pNtQuerySystemTime) {
+    total=0; vmin=(uint64_t)-1; vmax=0;
+    for (unsigned i=0;i<iters;i++) {
+      LARGE_INTEGER li; uint64_t t0=rdtsc64(); (void)pNtQuerySystemTime(&li); uint64_t t1=rdtsc64();
+      uint64_t dt = (t1-t0); total += dt; if (dt<vmin) vmin=dt; if (dt>vmax) vmax=dt;
+    }
+    out->syscall2_mean = total/iters; out->syscall2_min=vmin; out->syscall2_max=vmax;
+  }
 }
 
 static void cpuid_ex(uint32_t leaf, uint32_t subleaf, uint32_t out[4])
@@ -377,8 +401,9 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   if (!info) return DBVM_DETECT_INDETERMINATE;
   memset(info, 0, sizeof(*info));
 
-  // Optional tuning: DBVM_SUSPECT_THRESHOLD_PCT (default 12)
-  int threshold_pct = 12;
+  // Optional tuning: DBVM_SUSPECT_THRESHOLD_PCT (default 40)
+  // Interpreted as: vmcall_mean >= ud2_mean * (1 + threshold_pct/100)
+  int threshold_pct = 40;
   char envbuf[32];
   DWORD n = GetEnvironmentVariableA("DBVM_SUSPECT_THRESHOLD_PCT", envbuf, sizeof(envbuf));
   if (n>0 && n < sizeof(envbuf)) {
@@ -405,12 +430,14 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults
+  // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults (optional, can be skipped)
   DWORD ex = 0;
+  char no_vm_env[8]; DWORD no_vm = GetEnvironmentVariableA("DBVM_NO_VM", no_vm_env, sizeof(no_vm_env));
 
   // Try Intel first (VMCALL)
-  unsigned long long rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
-  if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+  unsigned long long rax = 0;
+  if (!no_vm) rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+  if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 0;
@@ -421,8 +448,8 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // Try AMD (VMMCALL)
   ex = 0;
-  rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
-  if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+  if (!no_vm) rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+  if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
     info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
     info->used_vmmcall = 1;
@@ -446,7 +473,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // 1.b) RIP advance check on failing VMCALL/VMMCALL (#UD injection bug)
   uint64_t adv_vm=0, adv_vmm=0;
-  if (detect_vmcall_rip_advance(FALSE, &adv_vm)) {
+  if (!no_vm && detect_vmcall_rip_advance(FALSE, &adv_vm)) {
     info->vmcall_rip_advance = adv_vm;
     if (adv_vm >= 3) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
@@ -455,7 +482,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
       return info->result;
     }
   }
-  if (detect_vmcall_rip_advance(TRUE, &adv_vmm)) {
+  if (!no_vm && detect_vmcall_rip_advance(TRUE, &adv_vmm)) {
     info->vmmcall_rip_advance = adv_vmm;
     if (adv_vmm >= 3) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
@@ -477,14 +504,17 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
 
   g_probe_ctx.active = 1; g_probe_ctx.capture = info; // enable distribution capture
-  uint64_t vm_ud_vmcall = measure_ud_path_cycles_vmcall(FALSE); // Intel path
-  uint64_t vm_ud_vmmcall = measure_ud_path_cycles_vmcall(TRUE);  // AMD path
+  uint64_t vm_ud_vmcall = 0, vm_ud_vmmcall = 0;
+  if (!no_vm) {
+    vm_ud_vmcall = measure_ud_path_cycles_vmcall(FALSE); // Intel path
+    vm_ud_vmmcall = measure_ud_path_cycles_vmcall(TRUE);  // AMD path
+  }
   info->vm_ud_vmcall_cycles = vm_ud_vmcall;
   info->vm_ud_vmmcall_cycles = vm_ud_vmmcall;
 
   // Use the slower of the two as the signal carrier
   info->vmcall_ud_cycles = (vm_ud_vmcall > vm_ud_vmmcall) ? vm_ud_vmcall : vm_ud_vmmcall;
-  info->ud2_ud_cycles = measure_ud_path_cycles_ud2();
+  info->ud2_ud_cycles = no_vm ? 0 : measure_ud_path_cycles_ud2();
   g_probe_ctx.active = 0; g_probe_ctx.capture = NULL;
 
   // restore
@@ -521,7 +551,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   }
 
   // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF)
-  run_tf_order_probe(FALSE, info); // VMCALL
+  if (!no_vm) run_tf_order_probe(FALSE, info); // VMCALL
 
   // Syscall path timing via ntdll
   measure_syscall_path(info);
@@ -535,14 +565,14 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     return info->result;
   }
 
-  // - If vmcall-UD avg cycles >> ud2-UD cycles (e.g., >2x), very strong indication that
-  //   a ring -1 handler dispatched VMCALL and injected #UD (DBVM behavior), while still
-  //   hiding the hypervisor-present bit.
-  // empirical: DBVM adds consistent overhead; use a conservative 12% threshold
-  if (info->vmcall_ud_cycles && info->ud2_ud_cycles && info->vmcall_ud_cycles * 100 > info->ud2_ud_cycles * threshold_pct) {
+  // - If vmcall-UD avg cycles exceed ud2-UD cycles by threshold_pct or more,
+  //   strong indication that a ring -1 handler dispatched VMCALL and injected #UD
+  //   while still hiding the hypervisor-present bit.
+  if (info->vmcall_ud_cycles && info->ud2_ud_cycles &&
+      (info->vmcall_ud_cycles * 100ULL) >= (info->ud2_ud_cycles * (100ULL + (unsigned long long)threshold_pct))) {
     info->result = DBVM_DETECT_SUSPECT_DBVM;
     snprintf(info->reason, sizeof(info->reason),
-             "VMCALL#UD avg %llu vs UD2 %llu (>%d%%)",
+             "VMCALL#UD mean %llu vs UD2 %llu (>= %d%% over)",
              (unsigned long long)info->vmcall_ud_cycles,
              (unsigned long long)info->ud2_ud_cycles, threshold_pct);
     return info->result;
