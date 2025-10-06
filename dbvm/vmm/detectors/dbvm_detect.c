@@ -416,6 +416,22 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
   g_probe_ctx.active = 0;
 }
 
+static int tf_first_confirm(BOOL amd_vmmcall, dbvm_detect_info_t* out, int tries, int need_hits)
+{
+  int hits = 0;
+  for (int i=0;i<tries;i++) {
+    out->tf_exc_count = 0;
+    run_tf_order_probe(amd_vmmcall, out);
+    if (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+      hits++;
+      if (hits>=need_hits) return 1;
+    }
+    // small yield to reduce back-to-back coalescing
+    Sleep(0);
+  }
+  return 0;
+}
+
 static void measure_syscall_path(dbvm_detect_info_t* out)
 {
   HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
@@ -587,11 +603,11 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (opt-in, gated by DBVM_USE_FAULT_SEM=1)
-  //      ACCESS_VIOLATION here strongly implicates a mediator handling and mapping the pointer. Requires default P1/P3.
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (default ON; can disable with DBVM_DISABLE_FAULT_SEM=1)
+  //      ACCESS_VIOLATION here strongly implicates a mediator mapping the pointer. Note: relies on default P1/P3.
   if (!no_vm) {
-    char usefs[8]; DWORD usefs_dw = GetEnvironmentVariableA("DBVM_USE_FAULT_SEM", usefs, sizeof(usefs));
-    if (usefs_dw>0 && usefs[0]=='1') {
+    char disfs[8]; DWORD disfs_dw = GetEnvironmentVariableA("DBVM_DISABLE_FAULT_SEM", disfs, sizeof(disfs));
+    if (!(disfs_dw>0 && disfs[0]=='1')) {
       DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
       DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
       info->vmcall_fault_exc  = f_vm;
@@ -688,17 +704,14 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF) — always run, password-free
   if (!no_vm) {
-    // Prefer AMD VMMCALL first on AMD systems, but test both paths to be safe
-    run_tf_order_probe(TRUE, info); // VMMCALL
-    if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+    // Try a few times to avoid scheduler noise
+    if (tf_first_confirm(TRUE, info, 6, 1)) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMMCALL");
       return info->result;
     }
-    // Reset capture and try Intel VMCALL path
     info->tf_exc_count = 0;
-    run_tf_order_probe(FALSE, info); // VMCALL
-    if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+    if (tf_first_confirm(FALSE, info, 6, 1)) {
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
       snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMCALL");
       return info->result;
