@@ -555,20 +555,17 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (opt-in)
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (always record; confirm only on ACCESS_VIOLATION)
   //      ACCESS_VIOLATION here is a strong DBVM signature, as DBVM reads guest memory before validating passwords
-  {
-    char usefs[8]; DWORD usefs_dw = GetEnvironmentVariableA("DBVM_USE_FAULT_SEM", usefs, sizeof(usefs));
-    if (!no_vm && usefs_dw>0 && usefs[0]=='1') {
-      DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
-      DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
-      info->vmcall_fault_exc  = f_vm;
-      info->vmmcall_fault_exc = f_vmm;
-      if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
-        info->result = DBVM_DETECT_DBVM_CONFIRMED;
-        snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
-        return info->result;
-      }
+  if (!no_vm) {
+    DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
+    DWORD f_vmm = probe_vmcall_fault_semantics(TRUE);
+    info->vmcall_fault_exc  = f_vm;
+    info->vmmcall_fault_exc = f_vmm;
+    if (f_vm  == EXCEPTION_ACCESS_VIOLATION || f_vmm == EXCEPTION_ACCESS_VIOLATION) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "VM*CALL with NOACCESS ptr -> ACCESS_VIOLATION (DBVM pagefault injection)");
+      return info->result;
     }
   }
 
@@ -654,19 +651,22 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     info->cpuid_8000000a_edx = exta[3];
   }
 
-  // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF)
-  // Disabled by default as it does not currently affect classification and may vary by OS.
-  // Enable by setting DBVM_TF_PROBE=1 in the environment.
-  {
-    char tfen[8]; DWORD tfen_dw = GetEnvironmentVariableA("DBVM_TF_PROBE", tfen, sizeof(tfen));
-    if (!no_vm && tfen_dw>0 && tfen[0]=='1') {
-      run_tf_order_probe(FALSE, info); // VMCALL
-      // If single-step (#DB) arrives before #UD, it strongly indicates hypervisor mediation
-      if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
-        info->result = DBVM_DETECT_DBVM_CONFIRMED;
-        snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMCALL");
-        return info->result;
-      }
+  // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF) — always run, password-free
+  if (!no_vm) {
+    // Prefer AMD VMMCALL first on AMD systems, but test both paths to be safe
+    run_tf_order_probe(TRUE, info); // VMMCALL
+    if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMMCALL");
+      return info->result;
+    }
+    // Reset capture and try Intel VMCALL path
+    info->tf_exc_count = 0;
+    run_tf_order_probe(FALSE, info); // VMCALL
+    if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "TF-first (#DB before #UD) on VMCALL");
+      return info->result;
     }
   }
 
