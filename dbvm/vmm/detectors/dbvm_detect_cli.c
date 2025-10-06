@@ -52,6 +52,12 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
       printf("tf_exc_%u_code=0x%08X tf_exc_%u_eflags=0x%08X\n", i, info->tf_exc_codes[i], i, info->tf_exc_eflags[i]);
     }
   }
+  // Signals summary
+  printf("signals=TF%s TFpref%s SVM%s DESC%s\n",
+         info->sig_tf_plain?"+":"-",
+         info->sig_tf_prefixed?"+":"-",
+         info->sig_svm_suite?"+":"-",
+         info->sig_desc?"+":"-");
   printf("cpu_vendor=%s\n", info->cpu_vendor);
   printf("cpuid_80000001_ecx=0x%08X\n", info->cpuid_80000001_ecx);
   printf("cpuid_8000000a_eax=0x%08X\n", info->cpuid_8000000a_eax);

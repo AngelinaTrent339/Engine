@@ -78,6 +78,46 @@ static int sgdt_sidt_gueststyle_confirm(void)
   return (idt_guest_like >= 5 && gdt_guest_like >= 5);
 }
 
+// Helper: pick up to two distinct CPU affinity bits for cross-core repeats
+static int pick_two_affinity_masks(DWORD_PTR* m1, DWORD_PTR* m2)
+{
+  DWORD_PTR procMask=0, sysMask=0;
+  if (!GetProcessAffinityMask(GetCurrentProcess(), &procMask, &sysMask)) {
+    *m1 = 1; *m2 = 0; return 1;
+  }
+  // pick first two bits in procMask
+  DWORD_PTR first=0, second=0;
+  for (DWORD i=0;i<sizeof(DWORD_PTR)*8;i++) {
+    DWORD_PTR bit = ((DWORD_PTR)1)<<i;
+    if (procMask & bit) { if (!first) first=bit; else { second=bit; break; } }
+  }
+  *m1 = first ? first : 1;
+  *m2 = second; // may be 0 if single-core affinity
+  return second ? 2 : 1;
+}
+
+// Generic: build a one-instruction TF probe (prefix(optional) + 0F 01 xx) and record if SINGLE_STEP arrives first
+// probe_one_insn_tf_first is declared later after VEH/types are defined
+
+// Cross-core wrapper: run lambda-like probe twice with different affinity masks
+typedef int (*probe_fn_t)(void* ctx);
+static int run_cross_core_consistent(probe_fn_t fn, void* ctx)
+{
+  DWORD_PTR m1=0,m2=0; int n = pick_two_affinity_masks(&m1,&m2);
+  HANDLE th = GetCurrentThread();
+  DWORD_PTR old = SetThreadAffinityMask(th, m1);
+  int a = fn(ctx);
+  int b = 0;
+  if (n==2) {
+    SetThreadAffinityMask(th, m2);
+    b = fn(ctx);
+  } else {
+    b = a;
+  }
+  if (old) SetThreadAffinityMask(th, old);
+  return (a && b) ? 1 : 0;
+}
+
 typedef struct _vmcall_basic {
   uint32_t size;      // must be >= 12
   uint32_t password2; // default 0xFEDCBA98
@@ -435,6 +475,43 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   return 1;
 }
 
+// Now that VEH/types exist, define generic TF probe for arbitrary bytes
+static int probe_one_insn_tf_first(unsigned char prefix_or_00, unsigned char b1, unsigned char b2, unsigned char b3,
+                                   uint8_t* out_first_is_ss)
+{
+  unsigned char code[64]; size_t i=0;
+  // mov rax, rcx; mov rcx, r8
+  code[i++]=0x48; code[i++]=0x89; code[i++]=0xC8; code[i++]=0x4C; code[i++]=0x89; code[i++]=0xC1;
+  // pushfq; or qword [rsp],0x100; popfq
+  code[i++]=0x9C; code[i++]=0x48; code[i++]=0x81; code[i++]=0x0C; code[i++]=0x24; code[i++]=0x00; code[i++]=0x01; code[i++]=0x00; code[i++]=0x00; code[i++]=0x9D;
+  // prefix (optional, 0 means none)
+  unsigned char* insn = &code[i];
+  if (prefix_or_00) code[i++]=prefix_or_00;
+  // bytes for instruction
+  code[i++]=b1; code[i++]=b2; code[i++]=b3;
+  // ret
+  code[i++]=0xC3;
+  void* mem = VirtualAlloc(NULL, 128, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return 0;
+  memcpy(mem, code, i);
+
+  // Arm probe
+  g_probe_ctx.target_insn = ((unsigned char*)mem) + (insn - code);
+  g_probe_ctx.target_end  = ((unsigned char*)g_probe_ctx.target_insn) + 6;
+  g_probe_ctx.active      = 1;
+  g_probe_ctx.max_records = 4;
+  static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+
+  hv_call3_t fn = (hv_call3_t)mem;
+  vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active = 0;
+
+  int ok = (g_probe_ctx.capture && g_probe_ctx.capture->tf_exc_count>=1 && g_probe_ctx.capture->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
+  if (out_first_is_ss) *out_first_is_ss = ok ? 1 : 0;
+  return ok ? 1 : 0;
+}
+
 // Prefixed TF-first probe for password-free confirm
 static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_detect_info_t* out)
 {
@@ -516,6 +593,68 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
   __try { fn(&data, 0x11111111ULL, 0x22222222ULL); }
   __except(EXCEPTION_EXECUTE_HANDLER) { /* expected */ }
   g_probe_ctx.active = 0;
+}
+
+// Plain VM*CALL TF-first probe (Intel+AMD path); returns 1 on first exception SINGLE_STEP
+static int tf_first_plain_once(BOOL amd_vmmcall, dbvm_detect_info_t* out)
+{
+  out->tf_exc_count = 0;
+  run_tf_order_probe(amd_vmmcall, out);
+  return (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) ? 1 : 0;
+}
+
+typedef struct { BOOL amd; dbvm_detect_info_t* out; } tf_ctx_t;
+static int tf_plain_probe_thunk(void* p)
+{
+  tf_ctx_t* c = (tf_ctx_t*)p; return tf_first_plain_once(c->amd, c->out);
+}
+
+static int tf_first_plain_crosscore(dbvm_detect_info_t* out)
+{
+  // Try both VMMCALL and VMCALL; require cross-core consistency for whichever hits
+  tf_ctx_t ctxA = { TRUE, out }, ctxI = { FALSE, out };
+  if (run_cross_core_consistent(tf_plain_probe_thunk, &ctxA)) return 1;
+  if (run_cross_core_consistent(tf_plain_probe_thunk, &ctxI)) return 1;
+  return 0;
+}
+
+// Prefixed VM*CALL set TF-first probe across 66/F3/F2/67/48; cross-core consistency required
+typedef struct { BOOL amd; dbvm_detect_info_t* out; unsigned char prefix; } tfpref_ctx_t;
+static int tfpref_probe_thunk(void* p)
+{
+  tfpref_ctx_t* c = (tfpref_ctx_t*)p; return probe_prefixed_tf_first(c->amd, c->prefix, c->out);
+}
+
+static int tf_first_prefixed_crosscore(dbvm_detect_info_t* out)
+{
+  unsigned char prefs[5] = { 0x66, 0xF3, 0xF2, 0x67, 0x48 };
+  // Success if any prefix yields cross-core consistency on either AMD or Intel path
+  for (int vmm=0; vmm<2; vmm++) {
+    for (int i=0;i<5;i++) {
+      tfpref_ctx_t ctx = { vmm?TRUE:FALSE, out, prefs[i] };
+      if (run_cross_core_consistent(tfpref_probe_thunk, &ctx)) return 1;
+    }
+  }
+  return 0;
+}
+
+// SVM opcode suite TF-first/sequence probe; returns 1 if at least 2 opcodes yield TF-first or consistent non-bare ordering
+static int svm_suite_probe(dbvm_detect_info_t* out)
+{
+  // AMD SVM instruction group: 0F 01 D8..DF
+  unsigned char opcodes[8] = {0xD8,0xD9,0xDA,0xDB,0xDC,0xDD,0xDE,0xDF};
+  int hits = 0;
+  for (int i=0;i<8;i++) {
+    out->tf_exc_count = 0;
+    // prefix 0, then 0F 01 xx
+    g_probe_ctx.capture = out; // ensure capture points at 'out'
+    probe_one_insn_tf_first(0x00, 0x0F, 0x01, opcodes[i], NULL);
+    // vote if first is SINGLE_STEP or if we see a consistent two-#UD with TF set
+    if (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) { hits++; }
+    else if (out->tf_exc_count>=2 && out->tf_exc_codes[0]==EXCEPTION_ILLEGAL_INSTRUCTION && out->tf_exc_codes[1]==EXCEPTION_ILLEGAL_INSTRUCTION && (out->tf_exc_eflags[0] & 0x100)) { hits++; }
+    if (hits>=2) return 1;
+  }
+  return 0;
 }
 
 static int tf_first_confirm(BOOL amd_vmmcall, dbvm_detect_info_t* out, int tries, int need_hits)
@@ -733,7 +872,26 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   // 2) Password-agnostic side-channels
   info->hv_vendor_leaf_present = (uint32_t)hypervisor_present_bit();
 
-  // Perform measurements (always, to populate telemetry even if a confirm occurs)
+  // Signals (password-free)
+  int sig_tf_plain = tf_first_plain_crosscore(info);
+  int sig_tf_pref  = tf_first_prefixed_crosscore(info);
+  int sig_svm      = svm_suite_probe(info);
+  int sig_desc     = sgdt_sidt_gueststyle_confirm();
+  info->sig_tf_plain    = (uint8_t)(sig_tf_plain?1:0);
+  info->sig_tf_prefixed = (uint8_t)(sig_tf_pref?1:0);
+  info->sig_svm_suite   = (uint8_t)(sig_svm?1:0);
+  info->sig_desc        = (uint8_t)(sig_desc?1:0);
+
+  // Majority vote (2-of-4) among signals above (no timing, no passwords)
+  int votes = (sig_tf_plain?1:0) + (sig_tf_pref?1:0) + (sig_svm?1:0) + (sig_desc?1:0);
+  if (votes >= 2) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "Confirm (2/4) password-free signals");
+    return info->result;
+  }
+
+  // Perform measurements (always populate telemetry even if decision stays NO/SUSPECT)
   run_measurements(info, (int)no_vm);
 
   // CPUID 0x0D, subleaf 0 and XGETBV(0)
@@ -765,54 +923,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     info->cpuid_8000000a_edx = exta[3];
   }
 
-  // TF/#DB vs #UD ordering probe (log first two exceptions and RF/TF) — always run, password-free
-  int sig_tf_first_plain = 0;
-  if (!no_vm) {
-    if (tf_first_confirm(TRUE, info, 6, 1)) sig_tf_first_plain = 1;
-    info->tf_exc_count = 0;
-    if (!sig_tf_first_plain && tf_first_confirm(FALSE, info, 6, 1)) sig_tf_first_plain = 1;
-  }
-
-  // Prefixed VM*CALL TF-first (66, F3, REX.W)
-  int sig_tf_first_pref = 0;
-  if (!no_vm) {
-    unsigned char prefs[3] = { 0x66, 0xF3, 0x48 };
-    for (int vmm=0; vmm<2 && !sig_tf_first_pref; vmm++) {
-      for (int i=0;i<3 && !sig_tf_first_pref;i++) {
-        info->tf_exc_count = 0;
-        if (probe_prefixed_tf_first(vmm?TRUE:FALSE, prefs[i], info)) sig_tf_first_pref = 1;
-      }
-    }
-  }
-
-  // SGDT/SIDT guest-style (multi-sample)
-  int sig_desc = sgdt_sidt_gueststyle_confirm();
-
-  // Exception fingerprint: simple consistency check (first is SINGLE_STEP with TF set; second, if present, is ILLEGAL_INSTRUCTION)
-  int sig_fingerprint = 0;
-  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP) {
-    if (info->tf_exc_eflags[0] & 0x100) {
-      if (info->tf_exc_count<2 || info->tf_exc_codes[1]==EXCEPTION_ILLEGAL_INSTRUCTION)
-        sig_fingerprint = 1;
-    }
-  }
-
-  // Majority vote (2-of-3) among: TF-first (plain), TF-first (prefixed), SGDT/SIDT. Fingerprint strengthens TF signals.
-  int votes = 0;
-  votes += sig_tf_first_plain ? 1 : 0;
-  votes += sig_tf_first_pref ? 1 : 0;
-  votes += sig_desc ? 1 : 0;
-  if (votes >= 2) {
-    run_measurements(info, (int)no_vm);
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason), "Confirm (2/3): TF%s TFpref%s DESC%s%s",
-             sig_tf_first_plain?"+":"-",
-             sig_tf_first_pref?"+":"-",
-             sig_desc?"+":"-",
-             sig_fingerprint?" +fingerprint":"");
-    return info->result;
-  }
-
+  // Old TF/desc majority logic removed; decision now above based on signals (2-of-4)
   // Syscall path timing via ntdll
   measure_syscall_path(info);
 

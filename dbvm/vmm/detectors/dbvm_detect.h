@@ -48,6 +48,11 @@ typedef struct {
   // Prefixed variants (e.g., 66/F3/REX.W + VM*CALL) RIP advance after #UD
   uint64_t pref_vmcall_rip_advance;
   uint64_t pref_vmmcall_rip_advance;
+  // Password-free signals (for policy and debugging)
+  uint8_t  sig_tf_plain;      // TF-first on plain VM*CALL (multi-try, cross-core)
+  uint8_t  sig_tf_prefixed;   // TF-first on any prefixed VM*CALL (66/F3/F2/67/48), cross-core
+  uint8_t  sig_svm_suite;     // TF-first/sequence hit on any two SVM opcodes (0F 01 D8..DF)
+  uint8_t  sig_desc;          // SGDT/SIDT guest-style majority
   // TF/#DB vs #UD sequencing
   uint32_t tf_exc_count;           // number of exceptions captured (max 4)
   uint32_t tf_exc_codes[4];        // ordered exception codes
