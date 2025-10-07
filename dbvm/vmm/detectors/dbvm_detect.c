@@ -411,6 +411,11 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
   unsigned iters = 512; // more samples for stability
   char ibuf[16]; DWORD nn = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf, sizeof(ibuf));
   if (nn>0) { unsigned v=(unsigned)atoi(ibuf); if (v>=64 && v<=4096) iters=v; }
+  // Warm-up to fill icache and page tables
+  for (int w=0; w<32; w++) {
+    vmcall_basic_t data_w = {12, 0xDEADBEEF, 0xFFFFFFFF};
+    __try { (void)call_stub_nocf(fn, &data_w, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  }
   uint64_t total = 0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
   uint64_t samples[1024]; unsigned sc=0;
@@ -452,6 +457,8 @@ static void measure_ud_path_cycles_ud2(timing_stats_t* out)
   unsigned iters = 512;
   char ibuf2[16]; DWORD nn2 = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf2, sizeof(ibuf2));
   if (nn2>0) { unsigned v=(unsigned)atoi(ibuf2); if (v>=64 && v<=4096) iters=v; }
+  // Warm-up
+  for (int w=0; w<32; w++) { __try { fn(); } __except(EXCEPTION_EXECUTE_HANDLER) {} }
   uint64_t total=0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
   uint64_t samples[1024]; unsigned sc=0;
@@ -494,6 +501,12 @@ static void measure_pairwise_delta(BOOL amd_vmmcall, timing_stats_t* out)
   char ibuf[16]; DWORD nn = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf, sizeof(ibuf));
   if (nn>0) { unsigned v=(unsigned)atoi(ibuf); if (v>=64 && v<=4096) iters=v; }
   uint64_t samples[1024]; unsigned sc=0;
+  // Warm-up
+  for (int w=0; w<32; w++) {
+    vmcall_basic_t data_w = {12, 0xDEADBEEF, 0xFFFFFFFF};
+    __try { (void)call_stub_nocf(fn_vm, &data_w, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    __try { fn_ud(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  }
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     // VM*CALL timing
