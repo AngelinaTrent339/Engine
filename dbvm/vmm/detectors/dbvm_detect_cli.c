@@ -6,6 +6,7 @@
 #include <conio.h>
 
 #include "dbvm_detect.h"
+#include "dbvm_harvest.h"
 
 static const char* result_to_str(dbvm_detect_result_t r)
 {
@@ -123,6 +124,7 @@ int main(int argc, char** argv)
   int no_vm = 0;
   int allow_pw = 0;
   int enable_fault_sem = 0;
+  const wchar_t* harvest_path = NULL;
   for (int i=1;i<argc;i++) {
     if (_stricmp(argv[i], "--pause")==0) pause_after=1;
     else if (_stricmp(argv[i], "--json")==0) json=1;
@@ -134,6 +136,11 @@ int main(int argc, char** argv)
     else if (_stricmp(argv[i], "--no-vm")==0) no_vm=1;
     else if (_stricmp(argv[i], "--allow-password-probes")==0) allow_pw=1;
     else if (_stricmp(argv[i], "--fault-sem")==0) enable_fault_sem=1;
+    else if (_strnicmp(argv[i], "--harvest-file=", 15)==0) {
+      static wchar_t wbuf[1024];
+      int n = MultiByteToWideChar(CP_UTF8, 0, argv[i]+15, -1, wbuf, 1024);
+      if (n>0) harvest_path = wbuf;
+    }
   }
 
   if (no_vm) SetEnvironmentVariableA("DBVM_NO_VM", "1");
@@ -148,6 +155,17 @@ int main(int argc, char** argv)
 
   if (json) print_json(&info, r);
   else      print_text(&info, r);
+  if (harvest_path && !json) {
+    dbvm_keys_t keys; memset(&keys,0,sizeof(keys));
+    if (dbvm_harvest_from_file_utf16(harvest_path, &keys)) {
+      printf("harvest_success=1\n");
+      if (keys.have_p1) printf("harvest_p1=0x%016llX\n", (unsigned long long)keys.p1);
+      if (keys.have_p3) printf("harvest_p3=0x%016llX\n", (unsigned long long)keys.p3);
+      if (keys.have_p2) printf("harvest_p2=0x%08X\n", (unsigned)keys.p2);
+    } else {
+      printf("harvest_success=0\n");
+    }
+  }
   if (policy_mode && !json) {
     int likely = 0;
     double ud2 = (double) (info.ud2_ud_cycles ? info.ud2_ud_cycles : 1);

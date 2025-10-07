@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD 11)
 
 add_library(dbvm_detect STATIC
   detectors/dbvm_detect.c
+  detectors/dbvm_harvest.c
 )
 target_include_directories(dbvm_detect PUBLIC detectors)
 

@@ -5,6 +5,7 @@
 #include <intrin.h>
 #include <string.h>
 #include <stdio.h>
+#include <emmintrin.h>
 
 // Forward declare probe context type so helpers can reference it before usage
 struct probe_ctx_s {
@@ -259,7 +260,10 @@ static int try_common_passwords(BOOL* out_used_vmmcall, uint32_t* out_version)
 
 static unsigned long long rdtsc64(void)
 {
-  return __rdtsc();
+  _mm_lfence();
+  unsigned long long t = __rdtsc();
+  _mm_lfence();
+  return t;
 }
 
 // Emit a stub that executes UD2; ret
@@ -302,8 +306,14 @@ static DWORD probe_vmcall_fault_semantics(BOOL amd_vmmcall)
   vmcall_basic_t* data = (vmcall_basic_t*)noacc_ptr; // intentionally unreadable
   DWORD exc = 0;
   __try {
-    // Use default register passwords so DBVM proceeds to map the vmcall structure before Password2/command checks
-    (void)fn((void*)data, DBVM_P1, DBVM_P3);
+    // Use override if provided, else defaults
+    unsigned long long p1 = DBVM_P1, p3 = DBVM_P3;
+    char b1[32], b3[32];
+    DWORD n1 = GetEnvironmentVariableA("DBVM_P1_OVERRIDE", b1, sizeof(b1));
+    DWORD n3 = GetEnvironmentVariableA("DBVM_P3_OVERRIDE", b3, sizeof(b3));
+    if (n1>0) p1 = _strtoui64(b1, NULL, 0);
+    if (n3>0) p3 = _strtoui64(b3, NULL, 0);
+    (void)fn((void*)data, p1, p3);
   } __except(EXCEPTION_EXECUTE_HANDLER) {
     exc = GetExceptionCode();
   }
@@ -332,7 +342,8 @@ static void run_measurements(dbvm_detect_info_t* info, int no_vm)
   HANDLE th = GetCurrentThread();
   DWORD_PTR prev_aff = SetThreadAffinityMask(th, 1);
   int prev_prio = GetThreadPriority(th);
-  SetThreadPriority(th, THREAD_PRIORITY_HIGHEST);
+  SetThreadPriority(th, THREAD_PRIORITY_TIME_CRITICAL);
+  SetThreadPriorityBoost(th, TRUE);
 
   g_probe_ctx.active = 0; g_probe_ctx.capture = NULL;
   timing_stats_t vm_vmcall_stats = {0}, vm_vmmcall_stats = {0}, ud2_stats = {0};
@@ -381,10 +392,12 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
   if (!fn) { if (out) memset(out, 0, sizeof(*out)); return; }
 
   // Intentionally wrong passwords (so DBVM injects #UD). On bare metal, this is also #UD.
-  const unsigned iters = 256; // more samples for stability
+  unsigned iters = 512; // more samples for stability
+  char ibuf[16]; DWORD nn = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf, sizeof(ibuf));
+  if (nn>0) { unsigned v=(unsigned)atoi(ibuf); if (v>=64 && v<=4096) iters=v; }
   uint64_t total = 0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
-  uint64_t samples[256]; unsigned sc=0;
+  uint64_t samples[1024]; unsigned sc=0;
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     unsigned long long t0 = rdtsc64();
@@ -398,14 +411,17 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
-    if (sc<256) samples[sc++]=dt;
+    if (sc<1024) samples[sc++]=dt;
   }
   // summarize
   if (out) {
-    // simple insertion sort for small array
     for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
-    out->mean = ok ? (total / ok) : 0;
-    out->vmin = vmin; out->vmax = vmax;
+    unsigned lo = sc/20; unsigned hi = sc - lo; if (hi<=lo) { lo=0; hi=sc; }
+    uint64_t tsum=0; for (unsigned i=lo;i<hi;i++) tsum+=samples[i];
+    unsigned kept = (hi>lo)? (hi-lo):sc;
+    out->mean = kept ? (tsum / kept) : 0;
+    out->vmin = kept? samples[lo] : vmin;
+    out->vmax = kept? samples[hi-1] : vmax;
     out->p50 = samples[sc*50/100];
     out->p90 = samples[sc*90/100];
     out->p99 = samples[sc*99/100];
@@ -417,10 +433,12 @@ static void measure_ud_path_cycles_ud2(timing_stats_t* out)
   ud2_t fn = build_ud2_stub();
   if (!fn) { if (out) memset(out, 0, sizeof(*out)); return; }
   // Match VMCALL sample count to reduce variance
-  const unsigned iters = 256;
+  unsigned iters = 512;
+  char ibuf2[16]; DWORD nn2 = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf2, sizeof(ibuf2));
+  if (nn2>0) { unsigned v=(unsigned)atoi(ibuf2); if (v>=64 && v<=4096) iters=v; }
   uint64_t total=0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
-  uint64_t samples[256]; unsigned sc=0;
+  uint64_t samples[1024]; unsigned sc=0;
   for (unsigned i=0;i<iters;i++) {
     unsigned long long t0 = rdtsc64();
     __try {
@@ -433,12 +451,16 @@ static void measure_ud_path_cycles_ud2(timing_stats_t* out)
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
-    if (sc<256) samples[sc++]=dt;
+    if (sc<1024) samples[sc++]=dt;
   }
   if (out) {
     for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
-    out->mean = ok ? (total / ok) : 0;
-    out->vmin = vmin; out->vmax = vmax;
+    unsigned lo = sc/20; unsigned hi = sc - lo; if (hi<=lo) { lo=0; hi=sc; }
+    uint64_t tsum=0; for (unsigned i=lo;i<hi;i++) tsum+=samples[i];
+    unsigned kept = (hi>lo)? (hi-lo):sc;
+    out->mean = kept ? (tsum / kept) : 0;
+    out->vmin = kept? samples[lo] : vmin;
+    out->vmax = kept? samples[hi-1] : vmax;
     out->p50 = samples[sc*50/100];
     out->p90 = samples[sc*90/100];
     out->p99 = samples[sc*99/100];
@@ -852,10 +874,17 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   DWORD ex = 0;
   char no_vm_env[8]; DWORD no_vm = GetEnvironmentVariableA("DBVM_NO_VM", no_vm_env, sizeof(no_vm_env));
   char allow_pw_env[8]; DWORD allow_pw = GetEnvironmentVariableA("DBVM_ALLOW_PASSWORD_PROBES", allow_pw_env, sizeof(allow_pw_env));
+  // Optional overrides for P1/P3 from env when probes are allowed
+  unsigned long long OV_P1 = DBVM_P1, OV_P3 = DBVM_P3;
+  {
+    char b1[32], b3[32]; DWORD n1 = GetEnvironmentVariableA("DBVM_P1_OVERRIDE", b1, sizeof(b1)); DWORD n3 = GetEnvironmentVariableA("DBVM_P3_OVERRIDE", b3, sizeof(b3));
+    if (n1>0) OV_P1 = _strtoui64(b1, NULL, 0);
+    if (n3>0) OV_P3 = _strtoui64(b3, NULL, 0);
+  }
 
   if (!no_vm && allow_pw) {
     // Try Intel first (VMCALL)
-    unsigned long long rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+    unsigned long long rax = try_vmcall_getversion(FALSE, OV_P1, OV_P3, DBVM_P2, &ex);
     if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
       run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
@@ -868,7 +897,7 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
     // Try AMD (VMMCALL)
     ex = 0;
-    rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+    rax = try_vmcall_getversion(TRUE, OV_P1, OV_P3, DBVM_P2, &ex);
     if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
       run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
