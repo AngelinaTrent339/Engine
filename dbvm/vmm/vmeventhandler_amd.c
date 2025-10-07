@@ -123,7 +123,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
   {
     UINT32 exitcode = currentcpuinfo->vmcb->EXITCODE;
     if ((exitcode == VMEXIT_VMMCALL) || (exitcode == VMEXIT_NPF) ||
-        (exitcode == VMEXIT_EXCP14))
+        (exitcode == VMEXIT_EXCP14)  || (exitcode == VMEXIT_EXCP1))
     {
       int cpl = currentcpuinfo->vmcb->CPL;
       if (cpl == 3)
@@ -503,6 +503,36 @@ if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
     case VMEXIT_EXCP1:
     {
       int isFault=0; //on amd it seems it ever ever set RF. isDebugFault(currentcpuinfo->vmcb->DR6, currentcpuinfo->vmcb->DR7);
+
+      // Special-case: TF-first probe on VM*CALL at CPL=3 with invalid passwords
+      // should not lead to PF-first. If next bytes encode VM*CALL/VMMCALL, inject #UD now.
+      {
+        int cpl = currentcpuinfo->vmcb->CPL;
+        if (cpl == 3)
+        {
+          if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
+          {
+            int error = 0; UINT64 pfaddr = 0; int is_vm_insn = 0;
+            unsigned char *bytes = (unsigned char *)mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pfaddr);
+            if (bytes)
+            {
+              int start=0; while (start<12 && isPrefix(bytes[start])) start++;
+              if (start+2 < 15 && bytes[start]==0x0F && bytes[start+1]==0x01 &&
+                  (bytes[start+2]==0xD9 || bytes[start+2]==0xC1))
+                is_vm_insn = 1;
+              unmapVMmemory(bytes, 15);
+            }
+            if (is_vm_insn)
+            {
+              currentcpuinfo->vmcb->EVENTINJ = 0;
+              currentcpuinfo->vmcb->EXITINTINFO = 0;
+              raiseInvalidOpcodeException(currentcpuinfo);
+              currentcpuinfo->vmcb->VMCB_CLEAN_BITS &= ~(1<<0);
+              return 0;
+            }
+          }
+        }
+      }
 
       //int1 breakpoint
       nosendchar[getAPICID()]=0; //urrentcpuinfo->vmcb->CPL!=3;
