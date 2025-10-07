@@ -59,21 +59,48 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters);
 // to match bare-metal deltas (typically ~36-108 cycles difference vs UD2).
 //
 static volatile QWORD tsc_comp_cycles[256];
+static volatile QWORD tsc_comp_start_tsc[256];
 static volatile QWORD tsc_comp_expires_tsc[256];
 static volatile unsigned char tsc_comp_armed[256];
 
-static __inline QWORD choose_vmcall_comp(QWORD now)
+static void disarm_tsc_comp(int apicid, pcpuinfo cpu)
 {
-  // Target around 2.3k cycles (observed DBVM-UD2 delta ~2268..2412)
-  QWORD jitter = ((now >> 5) & 0xFF) % 145; // 0..144
-  return 2268ULL + jitter; // 2268..2412
+  if (apicid<0 || apicid>=256) return;
+  tsc_comp_armed[apicid]=0;
+  tsc_comp_cycles[apicid]=0;
+  tsc_comp_start_tsc[apicid]=0;
+  tsc_comp_expires_tsc[apicid]=0;
+
+  if (!cpu) cpu = getcpuinfo();
+  if (!cpu) return;
+
+  if (useSpeedhack)
+    return; // keep hooks enabled when speedhack is active
+
+  if (isAMD)
+  {
+    cpu->vmcb->InterceptRDTSC=0;
+    cpu->vmcb->InterceptRDTSCP=0;
+  }
+  else
+  {
+    if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
+      vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) & (QWORD)~(QWORD)RDTSC_EXITING);
+  }
+}
+
+static __inline QWORD choose_vmcall_target(QWORD now)
+{
+  // Target bare-metal delta window ~36-96 cycles with slight jitter
+  return 48ULL + ((now >> 4) & 0x1F); // 48..79
 }
 
 void schedule_vmcall_tsc_comp(int apicid)
 {
   if (apicid<0 || apicid>=256) return;
   QWORD now=_rdtsc();
-  tsc_comp_cycles[apicid]=choose_vmcall_comp(now);
+  tsc_comp_cycles[apicid]=choose_vmcall_target(now);
+  tsc_comp_start_tsc[apicid]=now;
   // expire quickly: only the next RDTSC in the exception path should get this
   tsc_comp_expires_tsc[apicid]=now+50000000; // ~25ms @2GHz to survive SEH/VEH overhead
   tsc_comp_armed[apicid]=1;
@@ -82,8 +109,11 @@ void schedule_vmcall_tsc_comp(int apicid)
   if (isAMD)
   {
     pcpuinfo c=getcpuinfo();
-    c->vmcb->InterceptRDTSC=1;
-    c->vmcb->InterceptRDTSCP=1;
+    if (c)
+    {
+      c->vmcb->InterceptRDTSC=1;
+      c->vmcb->InterceptRDTSCP=1;
+    }
   }
   else
   {
@@ -4131,19 +4161,28 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 
   // Apply one-shot TSC compensation if scheduled (e.g., after invalid VM*CALL)
   {
-    int apic=getAPICID();
-    if (apic>=0 && apic<256)
+    int apic = getAPICID();
+    if (apic>=0 && apic<256 && tsc_comp_armed[apic])
     {
-      QWORD comp=tsc_comp_cycles[apic];
-      if (comp && (realtime<=tsc_comp_expires_tsc[apic]))
+      if (tsc_comp_expires_tsc[apic] && realtime>tsc_comp_expires_tsc[apic])
       {
-        QWORD t_adj = (t>comp) ? (t-comp) : t;
-        // keep monotonic progression relative to the current floor
-        QWORD floor = (lTSC)? lTSC : t;
-        if (t_adj <= floor)
-          t_adj = floor + 36; // minimal forward progress to mimic normal deltas
-        t = t_adj;
-        tsc_comp_cycles[apic]=0; // one-shot
+        disarm_tsc_comp(apic, currentcpuinfo);
+      }
+      else
+      {
+        QWORD start = tsc_comp_start_tsc[apic];
+        QWORD desired = tsc_comp_cycles[apic] ? tsc_comp_cycles[apic] : 64;
+        QWORD actual = (realtime>start) ? (realtime-start) : 0;
+        if (actual>desired)
+        {
+          QWORD correction = actual - desired;
+          QWORD floor = (lTSC)? lTSC : t;
+          QWORD t_adj = (t>correction) ? (t-correction) : (floor?floor: t);
+          if (t_adj <= floor)
+            t_adj = floor + 36;
+          t = t_adj;
+        }
+        disarm_tsc_comp(apic, currentcpuinfo);
       }
     }
   }
@@ -4189,25 +4228,6 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     vmregisters->rax=t & 0xffffffff;
 
   vmregisters->rdx=t >> 32;
-
-  // If this was an armed one-shot, disarm intercept to avoid overhead
-  {
-    int apic=getAPICID();
-    if (apic>=0 && apic<256 && tsc_comp_armed[apic])
-    {
-      tsc_comp_armed[apic]=0;
-      if (isAMD)
-      {
-        currentcpuinfo->vmcb->InterceptRDTSC=0;
-        currentcpuinfo->vmcb->InterceptRDTSCP=0;
-      }
-      else
-      {
-        if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
-          vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) & (QWORD)~(QWORD)RDTSC_EXITING);
-      }
-    }
-  }
 
   if (lowestTSC<t)
     lowestTSC=t;

@@ -2579,9 +2579,6 @@ void setupVMX(pcpuinfo currentcpuinfo)
 
   vmwrite(vm_guest_interruptability_state,(UINT64)0); //interruptibility state
 
-  // Ensure RDTSC/RDTSCP are intercepted so timing spoof works reliably in usermode
-  vmx_enableTSCHook(currentcpuinfo);
-
 
 
 
