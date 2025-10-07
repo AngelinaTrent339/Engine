@@ -19,6 +19,7 @@ extern struct probe_ctx_s g_probe_ctx;
 
 // Forward decls used before their definitions
 static void cpuid_ex(uint32_t leaf, uint32_t subleaf, uint32_t out[4]);
+static LONG WINAPI vmcall_veh(EXCEPTION_POINTERS* ep);
 
 // ---- SGDT / SIDT helpers (user-mode safe) ----
 typedef void (WINAPI *sidt_fn_t)(void* out);
@@ -60,6 +61,43 @@ static void read_descriptor_tables(uint16_t* idt_lim, uint64_t* idt_base,
   if (idt_base) *idt_base = idt.base;
   if (gdt_lim) *gdt_lim = gdt.limit;
   if (gdt_base) *gdt_base = gdt.base;
+}
+
+// UD2 probe with VEH capture of first exception (without TF prefixing)
+typedef void (WINAPI *stub3_t)(void* a, unsigned long long b, unsigned long long c);
+static stub3_t build_ud2_capture_stub(unsigned char** out_insn)
+{
+  unsigned char code[16]; size_t i=0;
+  // UD2
+  if (out_insn) *out_insn = &((unsigned char*)0)[i];
+  code[i++]=0x0F; code[i++]=0x0B;
+  // ret
+  code[i++]=0xC3;
+  void* mem = VirtualAlloc(NULL, 4096, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+  if (!mem) return NULL;
+  memcpy(mem, code, i);
+  if (out_insn) *out_insn = ((unsigned char*)mem);
+  return (stub3_t)mem;
+}
+
+static void capture_ud2_first_exc(dbvm_detect_info_t* out)
+{
+  out->tf_exc_count = 0;
+  unsigned char* insn = NULL;
+  stub3_t fn = build_ud2_capture_stub(&insn);
+  if (!fn || !insn) return;
+  g_probe_ctx.target_insn = insn;
+  g_probe_ctx.target_end  = insn + 2;
+  g_probe_ctx.capture     = out;
+  g_probe_ctx.active      = 1;
+  g_probe_ctx.max_records = 4;
+  static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
+  __try { fn(NULL, 0, 0); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  g_probe_ctx.active = 0;
+  if (out->tf_exc_count>=1) {
+    out->ud2_first_exc = out->tf_exc_codes[0];
+    out->ud2_first_eflags = out->tf_exc_eflags[0];
+  }
 }
 
 static int sgdt_sidt_gueststyle_confirm(void)
@@ -606,6 +644,16 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
   g_probe_ctx.active = 0;
 }
 
+static void capture_vmcall_first_exc(BOOL amd_vmmcall, dbvm_detect_info_t* out)
+{
+  out->tf_exc_count = 0;
+  run_tf_order_probe(amd_vmmcall, out);
+  if (out->tf_exc_count>=1) {
+    out->vmcall_first_exc = out->tf_exc_codes[0];
+    out->vmcall_first_eflags = out->tf_exc_eflags[0];
+  }
+}
+
 // Plain VM*CALL TF-first probe (Intel+AMD path); returns 1 on first exception SINGLE_STEP
 static int tf_first_plain_once(BOOL amd_vmmcall, dbvm_detect_info_t* out)
 {
@@ -887,6 +935,15 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // Signals (password-free)
   int sig_tf_plain = tf_first_plain_crosscore(info);
+  // Capture first-exception snapshots for semantic diffs
+  capture_vmcall_first_exc(FALSE, info);
+  if (!info->vmcall_first_exc) capture_vmcall_first_exc(TRUE, info);
+  capture_ud2_first_exc(info);
+  // RF delta on #UD-first comparisons (VM*CALL vs UD2)
+  if (info->vmcall_first_exc==EXCEPTION_ILLEGAL_INSTRUCTION && info->ud2_first_exc==EXCEPTION_ILLEGAL_INSTRUCTION) {
+    if (((info->vmcall_first_eflags ^ info->ud2_first_eflags) & 0x10000) != 0)
+      info->rf_delta_signal = 1;
+  }
   // Confirm on #PF-first around VM*CALL by default. Allow disabling via DBVM_DISABLE_PF_CONFIRM=1.
   {
     char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
@@ -914,12 +971,20 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   info->sig_svm_suite   = (uint8_t)(sig_svm?1:0);
   info->sig_desc        = (uint8_t)(sig_desc?1:0);
 
-  // Majority vote (2-of-4) among signals above (no timing, no passwords)
-  int votes = (sig_tf_plain?1:0) + (sig_tf_pref?1:0) + (sig_svm?1:0) + (sig_desc?1:0);
+  // Strong descriptor fingerprint for DBVM Roblox anti-detection patch
+  if (info->idtr_limit == (8*256) && info->gdtr_limit == 0x58) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "IDTR=2048 & GDTR=88 (DBVM patch)");
+    return info->result;
+  }
+
+  // Majority vote (2+ signals) among signals above (no timing, no passwords)
+  int votes = (sig_tf_plain?1:0) + (sig_tf_pref?1:0) + (sig_svm?1:0) + (sig_desc?1:0) + (info->rf_delta_signal?1:0);
   if (votes >= 2) {
     run_measurements(info, (int)no_vm);
     info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason), "Confirm (2/4) password-free signals");
+    snprintf(info->reason, sizeof(info->reason), "Confirm (signals=%d, RF-delta=%u)", votes, (unsigned)info->rf_delta_signal);
     return info->result;
   }
 

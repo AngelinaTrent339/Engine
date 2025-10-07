@@ -46,6 +46,11 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
   printf("pref_vmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmcall_rip_advance);
   printf("pref_vmmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmmcall_rip_advance);
+  if (info->vmcall_first_exc || info->ud2_first_exc) {
+    printf("vmcall_first_exc=0x%08X vmcall_first_eflags=0x%08X\n", info->vmcall_first_exc, info->vmcall_first_eflags);
+    printf("ud2_first_exc=0x%08X ud2_first_eflags=0x%08X\n", info->ud2_first_exc, info->ud2_first_eflags);
+    printf("rf_delta_signal=%u\n", info->rf_delta_signal);
+  }
   if (info->tf_exc_count) {
     printf("tf_exc_count=%u\n", info->tf_exc_count);
     for (uint32_t i=0;i<info->tf_exc_count;i++) {
@@ -92,6 +97,9 @@ static void print_json(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("  \"gdtr_base\": %llu,\n", (unsigned long long)info->gdtr_base);
   printf("  \"vmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmcall_rip_advance);
   printf("  \"vmmcall_rip_advance\": %llu,\n", (unsigned long long)info->vmmcall_rip_advance);
+  printf("  \"vmcall_first\": { \"exc\": %u, \"eflags\": %u },\n", info->vmcall_first_exc, info->vmcall_first_eflags);
+  printf("  \"ud2_first\": { \"exc\": %u, \"eflags\": %u },\n", info->ud2_first_exc, info->ud2_first_eflags);
+  printf("  \"rf_delta_signal\": %u,\n", info->rf_delta_signal);
   printf("  \"tf_exc\": [");
   for (uint32_t i=0;i<info->tf_exc_count;i++) {
     printf("{\"code\":%u,\"eflags\":%u}%s", info->tf_exc_codes[i], info->tf_exc_eflags[i], (i+1<info->tf_exc_count)?",":"");

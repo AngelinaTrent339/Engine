@@ -48,6 +48,12 @@ typedef struct {
   // Prefixed variants (e.g., 66/F3/REX.W + VM*CALL) RIP advance after #UD
   uint64_t pref_vmcall_rip_advance;
   uint64_t pref_vmmcall_rip_advance;
+  // First-exception snapshots for semantic diffs
+  uint32_t vmcall_first_exc;       // first exception code seen around VM*CALL probe
+  uint32_t vmcall_first_eflags;    // EFLAGS at that exception
+  uint32_t ud2_first_exc;          // first exception code for UD2 probe
+  uint32_t ud2_first_eflags;       // EFLAGS at that exception
+  uint8_t  rf_delta_signal;        // 1 when RF bit differs VM*CALL vs UD2 on #UD-first
   // Password-free signals (for policy and debugging)
   uint8_t  sig_tf_plain;      // TF-first on plain VM*CALL (multi-try, cross-core)
   uint8_t  sig_tf_prefixed;   // TF-first on any prefixed VM*CALL (66/F3/F2/67/48), cross-core
