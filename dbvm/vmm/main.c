@@ -231,6 +231,11 @@ void vmm_entry2(void)
   cpuinfo->TSsegment=0;
   cpuinfo->TSaccessRights=0x8b;
   cpuinfo->self=cpuinfo;
+  
+  // Initialize performance counter virtualization for AP
+  cpuinfo->guestAPERF=0;
+  cpuinfo->guestMPERF=0;
+  cpuinfo->lastVMExitTSC=_rdtsc();
 
   lastaddedcpuinfo->next=cpuinfo;
   lastaddedcpuinfo=cpuinfo;
@@ -397,6 +402,11 @@ void vmm_entry(void)
   cpuinfo->apicid=getAPICID();
   cpuinfo->isboot=1;
   cpuinfo->self=cpuinfo;
+  
+  // Initialize performance counter virtualization
+  cpuinfo->guestAPERF=0;
+  cpuinfo->guestMPERF=0;
+  cpuinfo->lastVMExitTSC=_rdtsc();
 
 
 

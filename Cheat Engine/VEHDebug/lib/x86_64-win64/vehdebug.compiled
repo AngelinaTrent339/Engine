@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Compiler Value="C:\lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe" Date="1420791944"/>
+  <Params Value=" -Twin64 -Px86_64 -MDelphi -Scghi -CX -WR -O3 -Xs -XX -l -vewnhibq &quot;-FiC:\Users\FSOS\Documents\cheat-engine\Cheat Engine\VEHDebug\lib\x86_64-win64&quot; &quot;-FuC:\Users\FSOS\Documents\cheat-engine\Cheat Engine\VEHDebug\&quot; &quot;-FUC:\Users\FSOS\Documents\cheat-engine\Cheat Engine\VEHDebug\lib\x86_64-win64\&quot; &quot;-FEC:\Users\FSOS\Documents\cheat-engine\Cheat Engine\bin\&quot; &quot;-oC:\Users\FSOS\Documents\cheat-engine\Cheat Engine\bin\vehdebug-x86_64.dll&quot; vehdebug.lpr"/>
+</CONFIG>

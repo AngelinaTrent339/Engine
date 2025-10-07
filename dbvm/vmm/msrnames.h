@@ -100,7 +100,13 @@
 #define IA32_TSC_MSR              0x10
 #define IA32_TSC_AUX_MSR          0xc0000103
 
-#define VM_IGGNE_MSR           0xc0010115
+// Performance counter MSRs
+#define IA32_MPERF_MSR            0x000000E7  // Maximum Performance Frequency Clock Count
+#define IA32_APERF_MSR            0x000000E8  // Actual Performance Frequency Clock Count
+
+// AMD SVM MSRs
+#define VM_CR_MSR                 0xc0010114
+#define VM_IGGNE_MSR              0xc0010115
 #define VM_HSAVE_PA_MSR           0xc0010117 //AMD
 
 #endif /* MSRNAMES_H_ */

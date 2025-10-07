@@ -141,22 +141,42 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
     if (currentcpuinfo->singleStepping.LastInstructionWasSyscall)
     {
+      /* 
+       * TRAP FLAG HANDLING FOR SYSCALL INSTRUCTIONS
+       * 
+       * This is a critical anti-detection measure addressing the issue described in:
+       * https://howtohypervise.blogspot.com/2019/01/a-common-missight-in-most-hypervisors.html
+       * 
+       * The problem: When single-stepping through a SYSCALL instruction with TF set,
+       * the CPU copies RFLAGS (including TF) into R11 and then jumps to LSTAR.
+       * The next instruction at LSTAR executes with TF still set, causing an immediate
+       * debug exception. However, the SYSCALL also applies IA32_FMASK to RFLAGS, 
+       * which should mask off certain flags including TF.
+       *
+       * Our solution:
+       * 1. Before SYSCALL executes: Modify IA32_FMASK to NOT mask TF (done in vmxsetup.c)
+       * 2. After SYSCALL completes: Restore original IA32_FMASK value
+       * 3. Clear TF bit in R11 to match what bare-metal would have done
+       * 
+       * This makes the trap flag behavior indistinguishable from bare-metal hardware.
+       */
 
       if (currentcpuinfo->vmcb->RIP!=currentcpuinfo->vmcb->LSTAR)
       {
         nosendchar[getAPICID()]=0;
-        sendstringf("FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUCK\n");
+        sendstringf("Unexpected: RIP after syscall doesn't match LSTAR\n");
       }
 
       sendstringf("%d: exit. singleStepping.LastInstructionWasSyscall:  ExitCode=%x\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->EXITCODE);
       sendstringf("%d: RIP=%6 (rflags=%x) - Last instruction was a syscall.  Changing R11(%x) to hide the TF flag and restore the flag mask\n",currentcpuinfo->cpunr, currentcpuinfo->vmcb->RIP, currentcpuinfo->vmcb->RFLAGS, vmregisters->r11);
 
+      // Clear TF bit (bit 8) in R11 to match bare-metal behavior
       vmregisters->r11 &= ~(QWORD)(1<<8);
 
+      // Restore the original IA32_FMASK value
       currentcpuinfo->vmcb->SFMASK=currentcpuinfo->singleStepping.PreviousFMASK;
-     // currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
 
-      sendstringf("%d: r11=%x\n", currentcpuinfo->cpunr, vmregisters->r11);
+      sendstringf("%d: r11=%x (TF bit cleared)\n", currentcpuinfo->cpunr, vmregisters->r11);
 
       //efer is restored, fmask is restored, going to handle the step like always
     }
@@ -297,6 +317,13 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       QWORD value=getRegister(currentcpuinfo, vmregisters, gpr);
 
       sendstringf("cpu %d: CR3 write operation: %6 (gpr=%d  value=%6)\n", currentcpuinfo->cpunr, currentcpuinfo->vmcb->EXITINFO1, gpr, value);
+
+      // Ensure CR3 is within valid physical address range to match bare-metal
+      if ((value & ~MAXPHYADDRMASK) != 0)
+      {
+        sendstringf("CR3 value contains bits beyond MAXPHYADDR, masking\n");
+        value &= MAXPHYADDRMASK;
+      }
 
       result=setVM_CR3(currentcpuinfo, vmregisters, value);
 
@@ -893,15 +920,35 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_RDTSC:
     {
       int r;
+      QWORD exitTime=_rdtsc();
       r=handle_rdtsc(currentcpuinfo, vmregisters);
-      currentcpuinfo->lastTSCTouch=_rdtsc();
+      
+      // Track VM-exit overhead for APERF/MPERF accuracy
+      QWORD entryTime=_rdtsc();
+      QWORD overhead=entryTime-exitTime;
+      
+      // Update virtual performance counters accounting for overhead
+      currentcpuinfo->guestAPERF+=overhead;
+      currentcpuinfo->guestMPERF+=overhead;
+      currentcpuinfo->lastVMExitTSC=entryTime;
+      currentcpuinfo->lastTSCTouch=entryTime;
       return r;
     }
 
     case VMEXIT_RDTSCP:
     {
+      QWORD exitTime=_rdtsc();
       int r=handle_rdtsc(currentcpuinfo, vmregisters);
-      currentcpuinfo->lastTSCTouch=_rdtsc();
+      
+      // Track VM-exit overhead for APERF/MPERF accuracy
+      QWORD entryTime=_rdtsc();
+      QWORD overhead=entryTime-exitTime;
+      
+      // Update virtual performance counters accounting for overhead
+      currentcpuinfo->guestAPERF+=overhead;
+      currentcpuinfo->guestMPERF+=overhead;
+      currentcpuinfo->lastVMExitTSC=entryTime;
+      currentcpuinfo->lastTSCTouch=entryTime;
 
       vmregisters->rcx=readMSR(IA32_TSC_AUX_MSR);
       return r;
@@ -946,7 +993,18 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             currentcpuinfo->lastTSCTouch=globalTSC;
             currentcpuinfo->lowestTSC=0;
             lowestTSC=0;
+            break;
 
+          case IA32_APERF_MSR:
+            sendstringf("write to IA32_APERF (virtualizing)\n");
+            // Virtualize APERF - store guest's desired value
+            currentcpuinfo->guestAPERF=newvalue;
+            break;
+
+          case IA32_MPERF_MSR:
+            sendstringf("write to IA32_MPERF (virtualizing)\n");
+            // Virtualize MPERF - store guest's desired value
+            currentcpuinfo->guestMPERF=newvalue;
             break;
 
           case 0xc0000080://efer
@@ -1032,6 +1090,25 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           case IA32_TIME_STAMP_COUNTER:
             return handle_rdtsc(currentcpuinfo, vmregisters); //will be responsible for adjust rip as well
 
+          case IA32_APERF_MSR:
+            sendstringf("read from IA32_APERF (virtualizing)\n");
+            // Return virtualized APERF accounting for VM execution time
+            {
+              QWORD realtime=_rdtsc();
+              QWORD elapsed=realtime-currentcpuinfo->lastVMExitTSC;
+              value=currentcpuinfo->guestAPERF+elapsed;
+            }
+            break;
+
+          case IA32_MPERF_MSR:
+            sendstringf("read from IA32_MPERF (virtualizing)\n");
+            // Return virtualized MPERF accounting for VM execution time  
+            {
+              QWORD realtime=_rdtsc();
+              QWORD elapsed=realtime-currentcpuinfo->lastVMExitTSC;
+              value=currentcpuinfo->guestMPERF+elapsed;
+            }
+            break;
 
           case 0xc0000080://efer
             //update LMA
@@ -1048,6 +1125,29 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
           case VM_HSAVE_PA_MSR:
             value=currentcpuinfo->guest_VM_HSAVE_PA;
+            break;
+
+          case VM_CR_MSR:
+            // Hide SVM by returning VM_CR with SVM disabled
+            sendstringf("read from VM_CR_MSR (hiding SVM)\n");
+            try
+            {
+              value=readMSR(VM_CR_MSR);
+              // Set SVMDIS bit (bit 4) to indicate SVM is disabled
+              value |= (1ULL << 4);
+            }
+            except
+            {
+              // If MSR doesn't exist, return value indicating SVM disabled
+              value=(1ULL << 4);
+            }
+            tryend
+            break;
+
+          case VM_IGGNE_MSR:
+            // Hide this AMD SVM-specific MSR
+            sendstringf("read from VM_IGGNE_MSR (hiding, returning 0)\n");
+            value=0;
             break;
 
           default:
@@ -1360,20 +1460,79 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
     case VMEXIT_CPUID:
     {
       nosendchar[getAPICID()]=0;
-      // Minimal CPUID handler for AMD: mask hypervisor presence and vendor leaves
+      // Comprehensive CPUID handler for AMD: hide all hypervisor indicators
       UINT64 inleaf = vmregisters->rax;
+      UINT64 insubleaf = vmregisters->rcx;
       UINT64 a=vmregisters->rax, b=0, c=vmregisters->rcx, d=0;
       _cpuid(&a,&b,&c,&d);
 
+      // Hide hypervisor presence (CPUID.01H:ECX[31])
       if (inleaf==1)
       {
-        // Clear ECX[31] hypervisor-present bit
-        c &= ~(1ULL << 31);
+        c &= ~(1ULL << 31); // Clear hypervisor-present bit
+        sendstringf("CPUID leaf 1: hiding hypervisor bit\n");
       }
 
-      if ((inleaf & 0xFFF00000ULL)==0x40000000ULL)
+      // Hide all hypervisor vendor leaves (0x40000000-0x400000FF)
+      if ((inleaf & 0xFFFFFF00ULL)==0x40000000ULL)
       {
+        sendstringf("CPUID hypervisor leaf 0x%x: returning zeros\n", (DWORD)inleaf);
         a=0; b=0; c=0; d=0;
+      }
+
+      // For AMD extended CPUID leaf 0x8000000A (SVM features)
+      if (inleaf==0x8000000AULL)
+      {
+        sendstringf("CPUID leaf 0x8000000A (SVM): hiding nested virtualization\n");
+        // Clear all SVM feature bits or return as if SVM doesn't exist
+        a=0; b=0; c=0; d=0;
+      }
+
+      // For AMD extended leaf 0x80000001 (Extended Processor Info)
+      if (inleaf==0x80000001ULL)
+      {
+        // Clear SVM bit (ECX[2])
+        c &= ~(1ULL << 2);
+        sendstringf("CPUID leaf 0x80000001: hiding SVM support bit\n");
+      }
+
+      // Hide VMX/SVM capability indicators in other leaves
+      if (inleaf==0x80000000ULL)
+      {
+        // Limit max extended leaf to hide SVM leaf if needed
+        if (a>=0x8000000AULL)
+        {
+          // Don't limit, just hide the SVM data when accessed
+          sendstringf("CPUID leaf 0x80000000: max extended leaf = 0x%x\n", (DWORD)a);
+        }
+      }
+
+      // Fix XSAVE enumeration (CPUID leaf 0x0D) to avoid Roblox detection
+      // Roblox stores EAX,EBX,ECX,EDX in 128-bit buffer, extracts word 4 (ECX low16),
+      // XORs with 0x66B5 and checks if result == 0x25 (meaning ECX low16 == 0x6690)
+      if (inleaf == 0x0D)
+      {
+        sendstringf("CPUID 0x0D subleaf %d: EAX=%8 EBX=%8 ECX=%8 EDX=%8\n",
+                    (UINT32)insubleaf, (UINT32)a, (UINT32)b, (UINT32)c, (UINT32)d);
+        
+        if (insubleaf == 0)
+        {
+          UINT16 word4 = (UINT16)(c & 0xFFFF);
+          UINT16 test_result = word4 ^ 0x66B5;
+          
+          sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n",
+                      word4, test_result);
+          
+          if (test_result == 0x25)
+          {
+            c = (c & 0xFFFFFFFFFFFF0000ULL) | 0x6691;
+            sendstring("  >>> PATCHED ECX to avoid Roblox detection!\n");
+          }
+          
+          UINT16 word2 = (UINT16)(b & 0xFFFF);
+          UINT16 word3 = (UINT16)((b >> 16) & 0xFFFF);
+          sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
+        }
       }
 
       vmregisters->rax=a;
@@ -1385,7 +1544,7 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
       if (AMD_hasNRIPS)
         currentcpuinfo->vmcb->RIP=currentcpuinfo->vmcb->nRIP;
       else
-        currentcpuinfo->vmcb->RIP+=2; // cpuid is 2 bytes on AMD
+        currentcpuinfo->vmcb->RIP+=2; // cpuid is 2 bytes (0F A2)
 
       currentcpuinfo->vmcb->VMCB_CLEAN_BITS=0;
       return 0;

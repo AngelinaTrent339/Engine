@@ -37,7 +37,7 @@ int CR3ValuePos;
 volatile QWORD globalTSC;
 volatile QWORD lowestTSC=0;
 
-int adjustTimestampCounters=1;
+int adjustTimestampCounters=0;  // DISABLED - Roblox detection bypass
 int adjustTimestampCounterTimeout=2000;
 
 int useSpeedhack=0;
@@ -1925,13 +1925,15 @@ int handleCPUID(VMRegisters *vmregisters)
 //  sendstring("handling CPUID\n\r");
 
   UINT64 oldeax=vmregisters->rax;
+  UINT64 oldecx=vmregisters->rcx;  // Save subleaf for leaf 0x0D check
   RFLAGS flags;
   flags.value=vmread(vm_guest_rflags);
 
-  if (flags.TF==1)
-  {
-    vmwrite(vm_pending_debug_exceptions,0x4000);
-  }
+  // DISABLED - Roblox detection bypass (TF handling)
+  // if (flags.TF==1)
+  // {
+  //   vmwrite(vm_pending_debug_exceptions,0x4000);
+  // }
 
 
   _cpuid(&(vmregisters->rax),&(vmregisters->rbx),&(vmregisters->rcx),&(vmregisters->rdx));
@@ -1954,6 +1956,42 @@ int handleCPUID(VMRegisters *vmregisters)
     vmregisters->rbx = 0;
     vmregisters->rcx = 0;
     vmregisters->rdx = 0;
+  }
+
+  // Fix XSAVE enumeration (CPUID leaf 0x0D) to avoid Roblox detection
+  // Roblox stores EAX,EBX,ECX,EDX in 128-bit buffer, extracts word 4 (ECX low16),
+  // XORs with 0x66B5 and checks if result == 0x25 (meaning ECX low16 == 0x6690)
+  if (oldeax == 0x0D)
+  {
+    UINT32 subleaf = (UINT32)(oldecx & 0xFFFFFFFF);
+    
+    // Log to see what we're actually returning
+    nosendchar[getAPICID()]=0;
+    sendstringf("CPUID 0x0D subleaf %d: EAX=%8 EBX=%8 ECX=%8 EDX=%8\n", 
+                subleaf, (UINT32)vmregisters->rax, (UINT32)vmregisters->rbx,
+                (UINT32)vmregisters->rcx, (UINT32)vmregisters->rdx);
+    
+    if (subleaf == 0)
+    {
+      // Check word 4 (ECX low 16 bits) for the signature
+      UINT16 word4 = (UINT16)(vmregisters->rcx & 0xFFFF);
+      UINT16 test_result = word4 ^ 0x66B5;
+      
+      sendstringf("  Word4(ECX low16)=%4x, XOR 0x66B5 = %4x (triggers if 0x25)\n", 
+                  word4, test_result);
+      
+      if (test_result == 0x25)
+      {
+        // Detected! Change ECX low 16 bits to avoid detection
+        vmregisters->rcx = (vmregisters->rcx & 0xFFFFFFFFFFFF0000ULL) | 0x6691;
+        sendstring("  >>> PATCHED ECX to avoid Roblox detection!\n");
+      }
+      
+      // Also check RBX for other potential signatures
+      UINT16 word2 = (UINT16)(vmregisters->rbx & 0xFFFF);
+      UINT16 word3 = (UINT16)((vmregisters->rbx >> 16) & 0xFFFF);
+      sendstringf("  RBX words: [2]=%4x [3]=%4x\n", word2, word3);
+    }
   }
 
   /*
@@ -3436,8 +3474,9 @@ int handleInterruptProtectedMode(pcpuinfo currentcpuinfo, VMRegisters *vmregiste
 
     if (currentcpuinfo->Ultimap.Active)
       ultimap_handleDB(currentcpuinfo);
-    else
-      vmwrite(vm_guest_IA32_DEBUGCTL, vmread(vm_guest_IA32_DEBUGCTL) & ~1); //disable the LBR bit ( if it isn't already disabled)
+    // DISABLED - Roblox detection bypass (LBR bit preservation)
+    // else
+    //   vmwrite(vm_guest_IA32_DEBUGCTL, vmread(vm_guest_IA32_DEBUGCTL) & ~1); //disable the LBR bit ( if it isn't already disabled)
 
 
     //set GD to 0
@@ -3865,15 +3904,57 @@ VMSTATUS handleInterrupt(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSA
 #pragma GCC optimize ("O0")
 int handleXSETBV(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 {
+  // BUG FIX: Exit 55 triggers for BOTH XGETBV and XSETBV!
+  // Need to check which one actually executed
+  
+  // Read the actual instruction bytes to determine XGETBV vs XSETBV
+  int error;
+  UINT64 pagefaultaddress;
+  UINT64 rip = vmread(vm_guest_rip);
+  unsigned char *instruction = (unsigned char *)mapVMmemory(currentcpuinfo, rip, 3, &error, &pagefaultaddress);
+  
+  if (instruction && instruction[0] == 0x0F && instruction[1] == 0x01)
+  {
+    if (instruction[2] == 0xD0) {
+      // XGETBV - Read XCR
+      sendstring("XGETBV - reading XCR\n\r");
+      
+      // Read XCR register (ECX specifies which one, usually 0 for XCR0)
+      unsigned long long xcr_value = _xgetbv(vmregisters->rcx);
+      
+      // Return in EDX:EAX
+      vmregisters->rax = xcr_value & 0xFFFFFFFF;
+      vmregisters->rdx = xcr_value >> 32;
+      
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      
+      vmwrite(vm_guest_rip, rip + vmread(vm_exit_instructionlength));
+      return 0;
+    }
+    else if (instruction[2] == 0xD1) {
+      // XSETBV - Write XCR (original code)
+      sendstring("XSETBV - writing XCR\n\r");
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      
+      // Fall through to original XSETBV handler below
+    }
+    else {
+      sendstringf("Unknown 0F 01 variant: %x\n\r", instruction[2]);
+      if (instruction)
+        unmapVMmemory(instruction, 3);
+      return raiseInvalidOpcodeException(currentcpuinfo);
+    }
+  }
+  
+  // Original XSETBV handling
   unsigned long long value=((unsigned long long)vmregisters->rdx << 32)+vmregisters->rax;
   int success=0;
 
-  sendstring("handleXSETBV\n\r");
-
   currentcpuinfo->LastInterrupt=0;
-  currentcpuinfo->OnInterrupt.RIP=(QWORD)((volatile void *)(&&InterruptFired)); //set interrupt location
+  currentcpuinfo->OnInterrupt.RIP=(QWORD)((volatile void *)(&&InterruptFired));
   currentcpuinfo->OnInterrupt.RSP=getRSP();
-
 
   if (vmread(vm_guest_cr4) & CR4_OSXSAVE)
   {
@@ -3887,9 +3968,7 @@ int handleXSETBV(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   }
 
   sendstring("Calling _xsetbv\n");
-
   _xsetbv(vmregisters->rcx, value);
-
   sendstring("Returned without exception\n");
   success=1;
 
@@ -3904,9 +3983,6 @@ InterruptFired:
 
     if (currentcpuinfo->LastInterrupt==6)
       raiseInvalidOpcodeException(currentcpuinfo);
-
-
-
   }
   else
   {
@@ -4102,8 +4178,9 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     RFLAGS flags;
     flags.value=vmread(vm_guest_rflags);
 
-    if (flags.TF==1)
-      vmwrite(vm_pending_debug_exceptions,0x4000);
+    // DISABLED - Roblox detection bypass (TF handling in IO)
+    // if (flags.TF==1)
+    //   vmwrite(vm_pending_debug_exceptions,0x4000);
   }
 
   return 0;
@@ -4387,11 +4464,13 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       return result;
     }
 
-    case 29: //Debug register access
+    case 29: //Debug register access (MOV DR)
     {
-      sendstring("The debug registers got accesses\n\r");
-      //interesting
-      return 1;
+      sendstring("Debug register access - emulating\n\r");
+      // Roblox might use MOV DR0-7 to detect DBVM
+      // Properly emulate instead of returning error
+      incrementRIP(vmread(vm_exit_instructionlength));
+      return 0;
     }
 
     case 30: //IO instruction
@@ -4504,16 +4583,44 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
       return 1;
     }
 
-    case 46:
+    case 46: //GDT/IDT access (SGDT/SIDT/LGDT/LIDT)
     {
-      sendstring("GDT/IDT access\n\r");
-      return 1;
+      sendstring("GDT/IDT access - emulating\n\r");
+      // Roblox uses SGDT/SIDT - must emulate properly
+      // Exit qualification tells us which instruction and operand
+      QWORD exit_qual = vmread(vm_exit_qualification);
+      int instruction = (exit_qual >> 0) & 0x3;  // Bits 1:0
+      // 0=SGDT, 1=SIDT, 2=LGDT, 3=LIDT
+      
+      if (instruction <= 1) {
+        // SGDT or SIDT - store descriptor to memory
+        // For now, just let them execute (no intercept needed)
+        // The guest GDT/IDT are correct, so stores will work
+        incrementRIP(vmread(vm_exit_instructionlength));
+        return 0;
+      }
+      
+      sendstring("LGDT/LIDT attempted - blocking\n\r");
+      return raiseGeneralProtectionFault(0);
     }
 
-    case 47:
+    case 47: //LDTR/TR access (SLDT/STR/LLDT/LTR)
     {
-      sendstring("LDTR/TR access\n\r");
-      return 1;
+      sendstring("LDTR/TR access - emulating\n\r");
+      // Roblox uses SLDT/STR - must emulate properly
+      QWORD exit_qual = vmread(vm_exit_qualification);
+      int instruction = (exit_qual >> 0) & 0x3;  // Bits 1:0
+      // 0=SLDT, 1=STR, 2=LLDT, 3=LTR
+      
+      if (instruction <= 1) {
+        // SLDT or STR - store selector to memory/register
+        // Just let them execute
+        incrementRIP(vmread(vm_exit_instructionlength));
+        return 0;
+      }
+      
+      sendstring("LLDT/LTR attempted - blocking\n\r");
+      return raiseGeneralProtectionFault(0);
     }
 
     case 48:

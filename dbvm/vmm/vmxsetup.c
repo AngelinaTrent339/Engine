@@ -2393,8 +2393,10 @@ void setupVMX(pcpuinfo currentcpuinfo)
       vmwrite(vm_cr4_read_shadow,(UINT64)getCR4()); //cr4 read shadow
       vmwrite(vm_cr3_targetvalue0,(UINT64)getCR3()); //cr3-target value 0
 
-      vmwrite(vm_guest_gdtr_base,(UINT64)getGDTbase()); //gdtr base
-      vmwrite(vm_guest_idtr_base,(UINT64)getIDTbase()); //idtr base
+      // FIX: Use original OS GDT/IDT, not DBVM's custom ones
+      // This prevents Roblox SGDT/SIDT detection
+      vmwrite(vm_guest_gdtr_base,(UINT64)currentcpuinfo->vmxdata.originalhoststate.GDTR_BASE);
+      vmwrite(vm_guest_idtr_base,(UINT64)currentcpuinfo->vmxdata.originalhoststate.IDTR_BASE);
       vmwrite(vm_guest_gdt_limit,(UINT64)88); //gdtr limit
       vmwrite(vm_guest_idt_limit,(UINT64)8*256); //idtr limit
 

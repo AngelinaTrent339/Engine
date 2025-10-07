@@ -17,7 +17,7 @@
       <Language Value=""/>
       <CharSet Value=""/>
     </VersionInfo>
-    <BuildModes Count="4" Active="release 32">
+    <BuildModes Count="4" Active="release 64">
       <Item1 Name="release" Default="True"/>
       <Item2 Name="debug">
         <CompilerOptions>
@@ -164,7 +164,7 @@
       <Unit0>
         <Filename Value="vehdebug.lpr"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="9"/>
+        <EditorIndex Value="5"/>
         <WindowIndex Value="1"/>
         <CursorPos Y="18"/>
         <UsageCount Value="213"/>
@@ -221,7 +221,7 @@
       <Unit7>
         <Filename Value="VEHDebugSharedMem.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="4"/>
         <WindowIndex Value="1"/>
         <UsageCount Value="213"/>
         <Loaded Value="True"/>
@@ -250,7 +250,7 @@
       <Unit11>
         <Filename Value="threadpoll.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="2"/>
         <WindowIndex Value="1"/>
         <TopLine Value="110"/>
         <CursorPos X="22" Y="123"/>
@@ -267,7 +267,7 @@
       <Unit13>
         <Filename Value="extcont.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="11"/>
+        <EditorIndex Value="6"/>
         <WindowIndex Value="1"/>
         <CursorPos X="7" Y="11"/>
         <UsageCount Value="196"/>
@@ -290,7 +290,7 @@
       <Unit16>
         <Filename Value="SimpleThread.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="3"/>
         <WindowIndex Value="1"/>
         <TopLine Value="6"/>
         <CursorPos X="45" Y="6"/>
@@ -398,12 +398,11 @@
       </Unit30>
       <Unit31>
         <Filename Value="C:\development\fpc\rtl\win\wininc\struct.inc"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="-1"/>
         <WindowIndex Value="1"/>
         <TopLine Value="3797"/>
         <CursorPos X="11" Y="3813"/>
         <UsageCount Value="38"/>
-        <Loaded Value="True"/>
       </Unit31>
       <Unit32>
         <Filename Value="C:\development\fpc\rtl\win\wininc\func.inc"/>
@@ -416,30 +415,27 @@
       </Unit32>
       <Unit33>
         <Filename Value="C:\lazarus164\fpc\3.0.2\source\rtl\win\wininc\defines.inc"/>
-        <EditorIndex Value="10"/>
+        <EditorIndex Value="-1"/>
         <WindowIndex Value="1"/>
         <TopLine Value="2258"/>
         <CursorPos X="6" Y="2271"/>
         <UsageCount Value="48"/>
-        <Loaded Value="True"/>
       </Unit33>
       <Unit34>
         <Filename Value="C:\development\fpc\packages\fcl-base\src\syncobjs.pp"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="-1"/>
         <WindowIndex Value="1"/>
         <TopLine Value="32"/>
         <CursorPos X="19" Y="48"/>
         <UsageCount Value="48"/>
-        <Loaded Value="True"/>
       </Unit34>
       <Unit35>
         <Filename Value="C:\development\fpc\rtl\inc\threadh.inc"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="-1"/>
         <WindowIndex Value="1"/>
         <TopLine Value="140"/>
         <CursorPos X="11" Y="157"/>
         <UsageCount Value="48"/>
-        <Loaded Value="True"/>
       </Unit35>
       <Unit36>
         <Filename Value="..\VEHDebugger.pas"/>
@@ -452,12 +448,11 @@
       </Unit36>
       <Unit37>
         <Filename Value="C:\lazarus322\fpc\3.2.2\source\rtl\win\wininc\defines.inc"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <WindowIndex Value="1"/>
         <TopLine Value="2750"/>
         <CursorPos X="34" Y="2761"/>
         <UsageCount Value="37"/>
-        <Loaded Value="True"/>
       </Unit37>
     </Units>
     <OtherDefines Count="2">
