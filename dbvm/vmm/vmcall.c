@@ -2479,10 +2479,14 @@ int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     vmregisters->rax=currentcpuinfo->vmcb->RAX; //fill it in, it may get used here
 
   {
-    // Prefixed VM*CALL/VMMCALL must raise #UD first, just like bare metal.
-    UINT32 vmcall_length = vmcall_fetch_length(currentcpuinfo);
-    if (vmcall_length != 3)
-      return raiseInvalidOpcodeException(currentcpuinfo);
+    // Prefixed VM*CALL/VMMCALL from ring3 must raise #UD first, just like bare metal.
+    int cpl = isAMD ? (currentcpuinfo->vmcb->cs_selector & 3) : (vmread(vm_guest_cs) & 3);
+    if (cpl == 3)
+    {
+      UINT32 vmcall_length = vmcall_fetch_length(currentcpuinfo);
+      if (vmcall_length != 3)
+        return raiseInvalidOpcodeException(currentcpuinfo);
+    }
   }
 
   //check password, if false, raise unknown opcode exception

@@ -9,11 +9,12 @@ This document describes a robust, password‑free method to detect Cheat Engine�
 - Clear decision ladder with representative logs (DBVM off/on).
 
 ## Primary, Password‑Free Signals
-- PF‑first on VM*CALL (CONFIRMS)
-  - What: Execute a one‑instruction TF probe around VMCALL/VMMCALL and record the first exception using a vectored exception handler (VEH).
-  - DBVM loaded: First exception is ACCESS_VIOLATION (0xC0000005) before #UD.
-  - No DBVM: First exception is ILLEGAL_INSTRUCTION (0xC000001D).
-  - Policy: If PF‑first is observed → DBVM_CONFIRMED, reason “VM*CALL first exception ACCESS_VIOLATION”.
+- PF‑first on VM*CALL (REMOVED — fixed in DBVM)
+  - DBVM has been updated so that a ring‑3 VMCALL/VMMCALL with invalid credentials never touches guest memory and always injects #UD first. Any attempt to rely on “page‑fault‑first” semantics no longer applies.
+  - Current behavior (post‑fix):
+    - DBVM loaded: first exception is ILLEGAL_INSTRUCTION (0xC000001D), identical to bare‑metal.
+    - No DBVM: first exception is ILLEGAL_INSTRUCTION (0xC000001D).
+  - Policy impact: Detectors must not use PF‑first as a confirm signal anymore.
 
 - Descriptor‑table fingerprint (CONFIRMS when present)
   - Some DBVM builds patch guest descriptor tables to avoid SIDT/SGDT detection: IDTR limit = 8*256 (2048), GDTR limit = 88.
@@ -44,16 +45,14 @@ Pairwise‑only thresholds (timing policy):
   - With DBVM loaded, deltas are thousands of cycles → triggers cleanly.
 
 ## Decision Ladder (Password‑Free)
-1) PF‑first on VM*CALL?
-   - Yes → DBVM_CONFIRMED (reason: VM*CALL first exception ACCESS_VIOLATION).
-2) Descriptor fingerprint present?
+1) Descriptor fingerprint present?
    - Yes → DBVM_CONFIRMED (reason: IDTR=2048 & GDTR=88).
-3) RIP‑advance on #UD?
+2) RIP‑advance on #UD?
    - Yes → DBVM_CONFIRMED.
-4) Timing side‑channel (pairwise only) meets delta thresholds?
+3) Timing side‑channel (pairwise only) meets delta thresholds?
    - Yes → DBVM_SUSPECT.
-5) If CPUID hypervisor bit set but no DBVM signature → OTHER_HYPERVISOR.
-6) Else → NO_HYPERVISOR.
+4) If CPUID hypervisor bit set but no DBVM signature → OTHER_HYPERVISOR.
+5) Else → NO_HYPERVISOR.
 
 ## Representative Logs
 The outputs below come from the detector’s CLI with the password‑free policy described above.
