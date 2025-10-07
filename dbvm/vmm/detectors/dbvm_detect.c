@@ -164,9 +164,9 @@ typedef struct _vmcall_basic {
 
 // Default DBVM register passwords (from source):
 // main.c:314..316
-static const unsigned long long DBVM_P1 = 0x0000000076543210ULL; // RDX
-static const unsigned long long DBVM_P3 = 0x0000000090909090ULL; // RCX
-static const unsigned long      DBVM_P2 = 0xFEDCBA98UL;          // struct field
+static const unsigned long long DBVM_P1 = 0x0000000072543210ULL; // RDX
+static const unsigned long long DBVM_P3 = 0x0000000030909090ULL; // RCX
+static const unsigned long      DBVM_P2 = 0xFEDCBA48UL;          // struct field
 
 // Tiny executable stubs emitted at runtime so we can issue VMCALL / VMMCALL from x64 usermode.
 // Windows x64 calling convention: RCX,RDX,R8,R9 are first four args.
@@ -644,6 +644,14 @@ static void run_tf_order_probe(BOOL amd_vmmcall, dbvm_detect_info_t* out)
   g_probe_ctx.active = 0;
 }
 
+// Return the first exception code observed for a single VM*CALL TF probe (does not clobber caller's info)
+static uint32_t vmcall_first_exc_probe(BOOL amd_vmmcall)
+{
+  dbvm_detect_info_t tmp; memset(&tmp, 0, sizeof(tmp));
+  run_tf_order_probe(amd_vmmcall, &tmp);
+  return (tmp.tf_exc_count>=1) ? tmp.tf_exc_codes[0] : 0;
+}
+
 static void capture_vmcall_first_exc(BOOL amd_vmmcall, dbvm_detect_info_t* out)
 {
   out->tf_exc_count = 0;
@@ -935,7 +943,30 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // Signals (password-free)
   int sig_tf_plain = tf_first_plain_crosscore(info);
-  // Capture first-exception snapshots for semantic diffs
+  // Snapshot result from the plain cross-core probe
+  uint32_t tf_plain_first = (info->tf_exc_count>=1) ? info->tf_exc_codes[0] : 0;
+  // Confirm on #PF-first around VM*CALL by default. Allow disabling via DBVM_DISABLE_PF_CONFIRM=1.
+  {
+    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
+    if (!(dis>0 && pfdis[0]=='1') && tf_plain_first==EXCEPTION_ACCESS_VIOLATION) {
+      run_measurements(info, (int)no_vm);
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
+      return info->result;
+    }
+  }
+  int sig_tf_pref  = tf_first_prefixed_crosscore(info);
+  uint32_t tf_pref_first = (info->tf_exc_count>=1) ? info->tf_exc_codes[0] : 0;
+  {
+    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
+    if (!(dis>0 && pfdis[0]=='1') && tf_pref_first==EXCEPTION_ACCESS_VIOLATION) {
+      run_measurements(info, (int)no_vm);
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "Prefixed VM*CALL first exception ACCESS_VIOLATION");
+      return info->result;
+    }
+  }
+  // After confirm checks, capture first-exception snapshots for semantic diffs
   capture_vmcall_first_exc(FALSE, info);
   if (!info->vmcall_first_exc) capture_vmcall_first_exc(TRUE, info);
   capture_ud2_first_exc(info);
@@ -944,32 +975,20 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     if (((info->vmcall_first_eflags ^ info->ud2_first_eflags) & 0x10000) != 0)
       info->rf_delta_signal = 1;
   }
-  // Confirm on #PF-first around VM*CALL by default. Allow disabling via DBVM_DISABLE_PF_CONFIRM=1.
-  {
-    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
-    if (!(dis>0 && pfdis[0]=='1') && info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
-      run_measurements(info, (int)no_vm);
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
-      return info->result;
-    }
-  }
-  int sig_tf_pref  = tf_first_prefixed_crosscore(info);
-  {
-    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
-    if (!(dis>0 && pfdis[0]=='1') && info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
-      run_measurements(info, (int)no_vm);
-      info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      snprintf(info->reason, sizeof(info->reason), "Prefixed VM*CALL first exception ACCESS_VIOLATION");
-      return info->result;
-    }
-  }
   int sig_svm      = svm_suite_probe(info);
   int sig_desc     = sgdt_sidt_gueststyle_confirm();
   info->sig_tf_plain    = (uint8_t)(sig_tf_plain?1:0);
   info->sig_tf_prefixed = (uint8_t)(sig_tf_pref?1:0);
   info->sig_svm_suite   = (uint8_t)(sig_svm?1:0);
   info->sig_desc        = (uint8_t)(sig_desc?1:0);
+
+  // Fallback: if any of the just-ran TF probes yielded #PF first, confirm DBVM (password-free)
+  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
+    return info->result;
+  }
 
   // Strong descriptor fingerprint for DBVM Roblox anti-detection patch
   if (info->idtr_limit == (8*256) && info->gdtr_limit == 0x58) {
