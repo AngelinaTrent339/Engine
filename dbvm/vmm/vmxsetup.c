@@ -797,7 +797,9 @@ int vmx_enableSingleStepMode(void)
     //break on external interrupts and exceptions
     c->vmcb->InterceptVINTR=1;
     c->vmcb->InterceptINTR=1;
-    c->vmcb->InterceptExceptions=0x0000ffff;
+    // Intercept most exceptions during SS, but let #UD (6) go directly to the guest
+    // so a ring3 invalid VM*CALL yields #UD-first (no PF-first re-exit path).
+    c->vmcb->InterceptExceptions=0x0000ffff & ~(1<<6);
 
     //perhaps enable INTERRUPT_SHADOW?
 
