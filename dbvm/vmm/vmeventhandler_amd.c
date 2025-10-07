@@ -1450,11 +1450,21 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
 
     case VMEXIT_VMMCALL:
     {
-      //dbvm callback for amd
+      // dbvm callback for amd
       nosendchar[getAPICID()]=0;
-     // sendstringf("%d: handleVMCall()", currentcpuinfo->cpunr);
+      // If CPL=3 and passwords are invalid, inject #UD immediately (prevents any PF-first ordering)
+      {
+        int cpl = currentcpuinfo->vmcb->cs_selector & 3;
+        if (cpl == 3)
+        {
+          if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
+          {
+            raiseInvalidOpcodeException(currentcpuinfo);
+            return 0;
+          }
+        }
+      }
       return handleVMCall(currentcpuinfo, vmregisters);
-      break;
     }
 
     case VMEXIT_CPUID:
