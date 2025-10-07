@@ -2578,6 +2578,8 @@ void setupVMX(pcpuinfo currentcpuinfo)
   vmwrite(0x2802,(UINT64)0); //IA32_DEBUGCTL (low)
 
   vmwrite(vm_guest_interruptability_state,(UINT64)0); //interruptibility state
+  // Enable TSC intercepts so usermode timing spoofing is always available
+  vmx_enableTSCHook(currentcpuinfo);
 
 
 

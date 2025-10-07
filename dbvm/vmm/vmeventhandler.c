@@ -81,11 +81,25 @@ static void disarm_tsc_comp(int apicid, pcpuinfo cpu)
   {
     cpu->vmcb->InterceptRDTSC=0;
     cpu->vmcb->InterceptRDTSCP=0;
+    // Mark intercepts changed
+    cpu->vmcb->VMCB_CLEAN_BITS&=~(1<<0);
+    cpu->vmcb->VMCB_CLEAN_BITS=0;
+    // Restore TSC offset
+    // Find last scheduled comp; we don't track per-cpu history beyond cycles
+    // so just add back cycles if set.
+    if (tsc_comp_cycles[apicid])
+      cpu->vmcb->TSC_OFFSET += tsc_comp_cycles[apicid];
   }
   else
   {
     if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
       vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) & (QWORD)~(QWORD)RDTSC_EXITING);
+    // Restore VMX TSC offset if needed
+    if (tsc_comp_cycles[apicid])
+    {
+      QWORD cur=vmread(0x2010);
+      vmwrite(0x2010, cur + tsc_comp_cycles[apicid]);
+    }
   }
 }
 
@@ -113,12 +127,24 @@ void schedule_vmcall_tsc_comp(int apicid)
     {
       c->vmcb->InterceptRDTSC=1;
       c->vmcb->InterceptRDTSCP=1;
+      // Mark intercepts changed
+      c->vmcb->VMCB_CLEAN_BITS&=~(1<<0);
+      c->vmcb->VMCB_CLEAN_BITS=0;
+      // Apply immediate guest-visible TSC offset so the next reads already include the correction
+      if (tsc_comp_cycles[apicid])
+        c->vmcb->TSC_OFFSET -= tsc_comp_cycles[apicid];
     }
   }
   else
   {
     if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
       vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) | RDTSC_EXITING);
+    // Apply VMX TSC offset immediately
+    if (tsc_comp_cycles[apicid])
+    {
+      QWORD cur=vmread(0x2010);
+      vmwrite(0x2010, cur - tsc_comp_cycles[apicid]);
+    }
   }
 }
 
