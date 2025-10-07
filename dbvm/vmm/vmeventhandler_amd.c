@@ -1454,11 +1454,14 @@ if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
       nosendchar[getAPICID()]=0;
       // If CPL=3 and passwords are invalid, inject #UD immediately (prevents any PF-first ordering)
       {
-        int cpl = currentcpuinfo->vmcb->cs_selector & 3;
+        int cpl = currentcpuinfo->vmcb->CPL; // reliable CPL on AMD
         if (cpl == 3)
         {
           if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
           {
+            // Clear any pending reinjection info and force #UD
+            currentcpuinfo->vmcb->EVENTINJ = 0;
+            currentcpuinfo->vmcb->EXITINTINFO = 0;
             raiseInvalidOpcodeException(currentcpuinfo);
             return 0;
           }
