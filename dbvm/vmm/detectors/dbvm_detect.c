@@ -335,6 +335,7 @@ typedef struct timing_stats_s {
 static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out);
 static void measure_ud_path_cycles_ud2(timing_stats_t* out);
 static void measure_syscall_path(dbvm_detect_info_t* out);
+static void measure_pairwise_delta(BOOL amd_vmmcall, timing_stats_t* out);
 
 static void run_measurements(dbvm_detect_info_t* info, int no_vm)
 {
@@ -379,6 +380,21 @@ static void run_measurements(dbvm_detect_info_t* info, int no_vm)
   info->ud2_p90       = ud2_stats.p90;
   info->ud2_p99       = ud2_stats.p99;
 
+  // Pairwise delta for chosen path (default enabled; disable with DBVM_DISABLE_PAIRWISE=1)
+  {
+    char disbuf[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PAIRWISE", disbuf, sizeof(disbuf));
+    if (!(dis>0 && disbuf[0]=='1')) {
+      timing_stats_t d = {0};
+      measure_pairwise_delta(use_amd_path ? TRUE : FALSE, &d);
+      info->delta_mean = d.mean;
+      info->delta_min  = d.vmin;
+      info->delta_max  = d.vmax;
+      info->delta_p50  = d.p50;
+      info->delta_p90  = d.p90;
+      info->delta_p99  = d.p99;
+    }
+  }
+
   // Syscall path timing
   measure_syscall_path(info);
 
@@ -422,9 +438,9 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
     out->mean = kept ? (tsum / kept) : 0;
     out->vmin = kept? samples[lo] : vmin;
     out->vmax = kept? samples[hi-1] : vmax;
-    out->p50 = samples[sc*50/100];
-    out->p90 = samples[sc*90/100];
-    out->p99 = samples[sc*99/100];
+    out->p50 = kept? samples[lo + (kept*50/100)] : 0;
+    out->p90 = kept? samples[lo + (kept*90/100)] : 0;
+    out->p99 = kept? samples[lo + (kept*99/100)] : 0;
   }
 }
 
@@ -461,9 +477,51 @@ static void measure_ud_path_cycles_ud2(timing_stats_t* out)
     out->mean = kept ? (tsum / kept) : 0;
     out->vmin = kept? samples[lo] : vmin;
     out->vmax = kept? samples[hi-1] : vmax;
-    out->p50 = samples[sc*50/100];
-    out->p90 = samples[sc*90/100];
-    out->p99 = samples[sc*99/100];
+    out->p50 = kept? samples[lo + (kept*50/100)] : 0;
+    out->p90 = kept? samples[lo + (kept*90/100)] : 0;
+    out->p99 = kept? samples[lo + (kept*99/100)] : 0;
+  }
+}
+
+// Interleaved pairwise measurement: delta = (vmcall_dt - ud2_dt)
+static void measure_pairwise_delta(BOOL amd_vmmcall, timing_stats_t* out)
+{
+  if (out) memset(out, 0, sizeof(*out));
+  hv_call3_t fn_vm = build_vm_ud_stub(amd_vmmcall);
+  ud2_t fn_ud = build_ud2_stub();
+  if (!fn_vm || !fn_ud) return;
+  unsigned iters = 512;
+  char ibuf[16]; DWORD nn = GetEnvironmentVariableA("DBVM_MEASURE_ITERS", ibuf, sizeof(ibuf));
+  if (nn>0) { unsigned v=(unsigned)atoi(ibuf); if (v>=64 && v<=4096) iters=v; }
+  uint64_t samples[1024]; unsigned sc=0;
+  for (unsigned i=0;i<iters;i++) {
+    vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
+    // VM*CALL timing
+    uint64_t t0 = rdtsc64();
+    __try { (void)call_stub_nocf(fn_vm, &data, 0x11111111ULL, 0x22222222ULL); }
+    __except(EXCEPTION_EXECUTE_HANDLER) {}
+    uint64_t t1 = rdtsc64();
+    uint64_t vm_dt = t1 - t0;
+    // UD2 timing
+    t0 = rdtsc64();
+    __try { fn_ud(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+    t1 = rdtsc64();
+    uint64_t ud_dt = t1 - t0;
+    int64_t delta = (int64_t)vm_dt - (int64_t)ud_dt;
+    if (sc<1024) samples[sc++] = (delta<0)?0:(uint64_t)delta; // clamp negatives to 0
+  }
+  if (out) {
+    // sort
+    for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
+    unsigned lo = sc/20; unsigned hi = sc - lo; if (hi<=lo) { lo=0; hi=sc; }
+    uint64_t tsum=0; for (unsigned i=lo;i<hi;i++) tsum+=samples[i];
+    unsigned kept = (hi>lo)? (hi-lo):sc;
+    out->mean = kept ? (tsum / kept) : 0;
+    out->vmin = kept? samples[lo] : 0;
+    out->vmax = kept? samples[hi-1] : 0;
+    out->p50 = kept? samples[lo + (kept*50/100)] : 0;
+    out->p90 = kept? samples[lo + (kept*90/100)] : 0;
+    out->p99 = kept? samples[lo + (kept*99/100)] : 0;
   }
 }
 
@@ -1082,35 +1140,38 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
   }
 
   // - Percentile-based side-channel: require both p50 and p90 to exceed threshold
-  if (info->vmcall_ud_cycles && info->ud2_ud_cycles) {
-    unsigned long long t50_ok = (info->vmcall_p50 * 100ULL) >= (info->ud2_p50 * (100ULL + (unsigned long long)threshold_pct));
-    unsigned long long t90_ok = (info->vmcall_p90 * 100ULL) >= (info->ud2_p90 * (100ULL + (unsigned long long)threshold_pct));
-    if (t50_ok && t90_ok) {
-      info->result = DBVM_DETECT_SUSPECT_DBVM;
-      snprintf(info->reason, sizeof(info->reason),
-               "VMCALL#UD p50 %llu vs UD2 %llu; p90 %llu vs %llu (>= %d%%)",
-               (unsigned long long)info->vmcall_p50,
-               (unsigned long long)info->ud2_p50,
-               (unsigned long long)info->vmcall_p90,
-               (unsigned long long)info->ud2_p90,
-               threshold_pct);
-      // Stronger confirm if mean ratio is very high (default >= 2x); env override DBVM_CONFIRM_RATIO_X100
-      int confirm_ratio_x100 = 190;
-      char crbuf[32]; DWORD m = GetEnvironmentVariableA("DBVM_CONFIRM_RATIO_X100", crbuf, sizeof(crbuf));
-      if (m>0 && m<sizeof(crbuf)) {
-        int c = atoi(crbuf); if (c>=120 && c<=500) confirm_ratio_x100 = c;
-      }
-      unsigned long long mean_ratio_x100 = info->ud2_ud_cycles ? (info->vmcall_ud_cycles * 100ULL) / info->ud2_ud_cycles : 0ULL;
-      if (mean_ratio_x100 >= (unsigned long long)confirm_ratio_x100) {
-        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+  // Prefer pairwise delta (more stable). Thresholds tuned conservatively for low false positives.
+  {
+    // Defaults: p50 >= 1800 cycles and p90 >= 2300 cycles
+    int d50 = 1800, d90 = 2300;
+    char b50[16], b90[16]; DWORD n50 = GetEnvironmentVariableA("DBVM_DELTA_P50_MIN", b50, sizeof(b50)); DWORD n90 = GetEnvironmentVariableA("DBVM_DELTA_P90_MIN", b90, sizeof(b90));
+    if (n50>0) d50 = atoi(b50);
+    if (n90>0) d90 = atoi(b90);
+    if (info->delta_p50 && info->delta_p90) {
+      if ((int)info->delta_p50 >= d50 && (int)info->delta_p90 >= d90) {
+        info->result = DBVM_DETECT_SUSPECT_DBVM;
         snprintf(info->reason, sizeof(info->reason),
-                 "VMCALL#UD mean %llu vs UD2 %llu (ratio=%llux) >= %d%%",
-                 (unsigned long long)info->vmcall_ud_cycles,
-                 (unsigned long long)info->ud2_ud_cycles,
-                 (unsigned long long)mean_ratio_x100,
-                 confirm_ratio_x100);
+                 "Pairwise delta p50 %llu, p90 %llu (>= %d/%d)",
+                 (unsigned long long)info->delta_p50,
+                 (unsigned long long)info->delta_p90,
+                 d50, d90);
+        return info->result;
       }
-      return info->result;
+    } else if (info->vmcall_ud_cycles && info->ud2_ud_cycles) {
+      // Fallback to percentile ratio if pairwise not available
+      unsigned long long t50_ok = (info->vmcall_p50 * 100ULL) >= (info->ud2_p50 * (100ULL + (unsigned long long)threshold_pct));
+      unsigned long long t90_ok = (info->vmcall_p90 * 100ULL) >= (info->ud2_p90 * (100ULL + (unsigned long long)threshold_pct));
+      if (t50_ok && t90_ok) {
+        info->result = DBVM_DETECT_SUSPECT_DBVM;
+        snprintf(info->reason, sizeof(info->reason),
+                 "VMCALL#UD p50 %llu vs UD2 %llu; p90 %llu vs %llu (>= %d%%)",
+                 (unsigned long long)info->vmcall_p50,
+                 (unsigned long long)info->ud2_p50,
+                 (unsigned long long)info->vmcall_p90,
+                 (unsigned long long)info->ud2_p90,
+                 threshold_pct);
+        return info->result;
+      }
     }
   }
 

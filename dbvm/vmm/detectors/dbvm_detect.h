@@ -48,6 +48,13 @@ typedef struct {
   // Prefixed variants (e.g., 66/F3/REX.W + VM*CALL) RIP advance after #UD
   uint64_t pref_vmcall_rip_advance;
   uint64_t pref_vmmcall_rip_advance;
+  // Pairwise timing delta (vmcall_ud - ud2_ud) in cycles for the chosen VM*CALL path
+  uint64_t delta_mean;
+  uint64_t delta_min;
+  uint64_t delta_max;
+  uint64_t delta_p50;
+  uint64_t delta_p90;
+  uint64_t delta_p99;
   // First-exception snapshots for semantic diffs
   uint32_t vmcall_first_exc;       // first exception code seen around VM*CALL probe
   uint32_t vmcall_first_eflags;    // EFLAGS at that exception

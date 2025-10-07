@@ -47,6 +47,14 @@ static void print_text(const dbvm_detect_info_t* info, dbvm_detect_result_t r)
   printf("vmmcall_rip_advance=%llu\n", (unsigned long long)info->vmmcall_rip_advance);
   printf("pref_vmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmcall_rip_advance);
   printf("pref_vmmcall_rip_advance=%llu\n", (unsigned long long)info->pref_vmmcall_rip_advance);
+  if (info->delta_mean || info->delta_p50 || info->delta_p90) {
+    printf("delta_mean=%llu\n", (unsigned long long)info->delta_mean);
+    printf("delta_min=%llu delta_max=%llu\n", (unsigned long long)info->delta_min, (unsigned long long)info->delta_max);
+    printf("delta_p50=%llu delta_p90=%llu delta_p99=%llu\n",
+           (unsigned long long)info->delta_p50,
+           (unsigned long long)info->delta_p90,
+           (unsigned long long)info->delta_p99);
+  }
   if (info->vmcall_first_exc || info->ud2_first_exc) {
     printf("vmcall_first_exc=0x%08X vmcall_first_eflags=0x%08X\n", info->vmcall_first_exc, info->vmcall_first_eflags);
     printf("ud2_first_exc=0x%08X ud2_first_eflags=0x%08X\n", info->ud2_first_exc, info->ud2_first_eflags);
