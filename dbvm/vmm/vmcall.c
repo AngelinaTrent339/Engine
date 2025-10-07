@@ -2363,6 +2363,65 @@ int _handleVMCallInstruction(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, 
   return 0;
 }
 
+static int vmcall_is_prefix_byte(unsigned char b)
+{
+  if ((b & 0xF0) == 0x40) // REX prefix range 0x40-0x4F
+    return 1;
+
+  switch (b)
+  {
+    case 0x26:
+    case 0x2e:
+    case 0x36:
+    case 0x3e:
+    case 0x64:
+    case 0x65:
+    case 0x66:
+    case 0x67:
+    case 0xf0:
+    case 0xf2:
+    case 0xf3:
+      return 1;
+  }
+
+  return 0;
+}
+
+static UINT32 vmcall_fetch_length(pcpuinfo currentcpuinfo)
+{
+  UINT64 linear_rip;
+  unsigned char expected_opcode = isAMD ? 0xD9 : 0xC1;
+  int error = 0;
+  UINT64 pagefaultaddress = 0;
+  unsigned char *bytes;
+  UINT32 length = 0;
+  unsigned int prefix_count = 0;
+  const unsigned int maxlen = 15;
+
+  if (isAMD)
+    linear_rip = currentcpuinfo->vmcb->cs_base + currentcpuinfo->vmcb->RIP;
+  else
+    linear_rip = vmread(vm_guest_cs_base) + vmread(vm_guest_rip);
+
+  bytes = (unsigned char *)mapVMmemory(currentcpuinfo, linear_rip, maxlen, &error, &pagefaultaddress);
+  if (!bytes)
+    return 0;
+
+  while ((prefix_count + 2) < maxlen && vmcall_is_prefix_byte(bytes[prefix_count]))
+    prefix_count++;
+
+  if ((prefix_count + 2) < maxlen &&
+      bytes[prefix_count] == 0x0f &&
+      bytes[prefix_count + 1] == 0x01 &&
+      bytes[prefix_count + 2] == expected_opcode)
+  {
+    length = (UINT32)(prefix_count + 3);
+  }
+
+  unmapVMmemory(bytes, maxlen);
+  return length;
+}
+
 int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
 /*
  * vmcall:
@@ -2419,6 +2478,12 @@ int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   if (isAMD)
     vmregisters->rax=currentcpuinfo->vmcb->RAX; //fill it in, it may get used here
 
+  {
+    // Prefixed VM*CALL/VMMCALL must raise #UD first, just like bare metal.
+    UINT32 vmcall_length = vmcall_fetch_length(currentcpuinfo);
+    if (vmcall_length != 3)
+      return raiseInvalidOpcodeException(currentcpuinfo);
+  }
 
   //check password, if false, raise unknown opcode exception
   if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
