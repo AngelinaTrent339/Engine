@@ -300,7 +300,9 @@ int raiseInvalidOpcodeException(pcpuinfo currentcpuinfo)
 
     vmwrite(vm_entry_interruptioninfo, (ULONG)newintinfo.interruption_information); //entry info field
     vmwrite(0x4018, 0); //entry errorcode
-    vmwrite(0x401a, vmread(0x440c)); //entry instruction length (not sure about this)
+    // For #UD injection, do not advance guest RIP. Ensure VM-entry instruction length is 0.
+    // Using the VM-exit instruction length here caused RIP-advance anomalies detectable by AC.
+    vmwrite(0x401a, 0); //entry instruction length
   }
 
   return 0;

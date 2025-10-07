@@ -279,7 +279,10 @@ void setupVMX_AMD(pcpuinfo currentcpuinfo)
   currentcpuinfo->vmcb->InterceptVMMCALL=1;
   currentcpuinfo->vmcb->MSR_PROT=1; //some msr's need to be protected
 
-  currentcpuinfo->vmcb->InterceptExceptions=(1<<1) | (1<<3) | (1<<6);// | (1<<14); //intercept int1, 3 and 14
+  // Intercept #DB and #BP only. Do NOT intercept #UD (6) globally.
+  // Intercepting #UD causes injected #UD (e.g., from VMMCALL password fail)
+  // to VM-exit again and hit the generic exception handler which spins.
+  currentcpuinfo->vmcb->InterceptExceptions=(1<<1) | (1<<3);// | (1<<14); //intercept int1, 3 and 14
 
  // currentcpuinfo->vmcb->InterceptINTR=1;
  // currentcpuinfo->vmcb->InterceptDR0_15Write=(1<<6); //dr6 so I can see what changed
@@ -895,7 +898,9 @@ int vmx_disableSingleStepMode(void)
 
     c->vmcb->InterceptVINTR=0;
     c->vmcb->InterceptINTR=0;
-    c->vmcb->InterceptExceptions=(1<<1) | (1<<3) | (1<<6); // todo: load current exceptions hooks
+    // Restore default: only intercept #DB and #BP after disabling SS mode
+    // Do NOT intercept #UD here, to avoid trapping injected #UD.
+    c->vmcb->InterceptExceptions=(1<<1) | (1<<3); // todo: load current exceptions hooks
 
 
     //mark the intercepts as changed
