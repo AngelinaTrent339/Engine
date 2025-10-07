@@ -60,12 +60,13 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters);
 //
 static volatile QWORD tsc_comp_cycles[256];
 static volatile QWORD tsc_comp_expires_tsc[256];
+static volatile unsigned char tsc_comp_armed[256];
 
 static __inline QWORD choose_vmcall_comp(QWORD now)
 {
-  // Target around 2.2-2.6k cycles (observed DBVM overhead minus bare‑metal)
-  // Narrow jitter to avoid negative deltas and stay within typical noise envelope
-  return 2100ULL + ((now >> 4) & 0xFF) * 2ULL; // 2100..2608
+  // Target around 2.3k cycles (observed DBVM-UD2 delta ~2268..2412)
+  QWORD jitter = ((now >> 5) & 0xFF) % 145; // 0..144
+  return 2268ULL + jitter; // 2268..2412
 }
 
 void schedule_vmcall_tsc_comp(int apicid)
@@ -75,6 +76,20 @@ void schedule_vmcall_tsc_comp(int apicid)
   tsc_comp_cycles[apicid]=choose_vmcall_comp(now);
   // expire quickly: only the next RDTSC in the exception path should get this
   tsc_comp_expires_tsc[apicid]=now+200000; // ~0.1-0.2ms @2GHz
+  tsc_comp_armed[apicid]=1;
+
+  // Arm an RDTSC intercept for a single shot
+  if (isAMD)
+  {
+    pcpuinfo c=getcpuinfo();
+    c->vmcb->InterceptRDTSC=1;
+    c->vmcb->InterceptRDTSCP=1;
+  }
+  else
+  {
+    if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
+      vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) | RDTSC_EXITING);
+  }
 }
 
 
@@ -4174,6 +4189,25 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     vmregisters->rax=t & 0xffffffff;
 
   vmregisters->rdx=t >> 32;
+
+  // If this was an armed one-shot, disarm intercept to avoid overhead
+  {
+    int apic=getAPICID();
+    if (apic>=0 && apic<256 && tsc_comp_armed[apic])
+    {
+      tsc_comp_armed[apic]=0;
+      if (isAMD)
+      {
+        currentcpuinfo->vmcb->InterceptRDTSC=0;
+        currentcpuinfo->vmcb->InterceptRDTSCP=0;
+      }
+      else
+      {
+        if ((readMSR(IA32_VMX_PROCBASED_CTLS_MSR)>>32) & RDTSC_EXITING)
+          vmwrite(vm_execution_controls_cpu, vmread(vm_execution_controls_cpu) & (QWORD)~(QWORD)RDTSC_EXITING);
+      }
+    }
+  }
 
   if (lowestTSC<t)
     lowestTSC=t;
