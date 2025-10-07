@@ -223,10 +223,10 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
           unmapVMmemory(bytes, size);
           return 0;
         }
-        else
+else
         {
-          //valid instruction
-          if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
+//valid instruction
+if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
           {
             sendstringf("%d: it IS a syscall\n", currentcpuinfo->cpunr);
             currentcpuinfo->singleStepping.LastInstructionWasSyscall=1;
