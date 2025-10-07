@@ -419,20 +419,28 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
   uint64_t total = 0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
   uint64_t samples[1024]; unsigned sc=0;
-  for (unsigned i=0;i<iters;i++) {
+  // preemption gating threshold (percent of wall time consumed by thread cycles)
+  ULONG64 qtc_min_share = 40; { char s[16]; DWORD n=GetEnvironmentVariableA("DBVM_QTC_MIN_SHARE", s, sizeof(s)); if (n>0){ unsigned v=atoi(s); if (v<=100) qtc_min_share=v; }}
+  HANDLE th = GetCurrentThread();
+  // collect exactly 'iters' accepted samples, retry up to 4x attempts
+  for (unsigned i=0, attempts=0; i<iters && attempts < iters*4; attempts++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-    unsigned long long t0 = rdtsc64();
-  __try {
+    ULONG64 q0=0,q1=0; QueryThreadCycleTime(th, &q0); unsigned long long t0 = rdtsc64();
+    __try {
       (void)call_stub_nocf(fn, &data, 0x11111111ULL, 0x22222222ULL);
-  } __except(EXCEPTION_EXECUTE_HANDLER) {
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
       // expected: illegal instruction
     }
-    unsigned long long t1 = rdtsc64();
+    unsigned long long t1 = rdtsc64(); QueryThreadCycleTime(th, &q1);
     uint64_t dt = (t1 - t0);
+    uint64_t dqc = (uint64_t)(q1 - q0);
+    // drop sample if thread CPU share too low
+    if (dqc * 100ULL < dt * qtc_min_share) { continue; }
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
     if (sc<1024) samples[sc++]=dt;
+    i++;
   }
   // summarize
   if (out) {
@@ -462,19 +470,24 @@ static void measure_ud_path_cycles_ud2(timing_stats_t* out)
   uint64_t total=0, ok=0;
   uint64_t vmin = (uint64_t)-1, vmax = 0;
   uint64_t samples[1024]; unsigned sc=0;
-  for (unsigned i=0;i<iters;i++) {
-    unsigned long long t0 = rdtsc64();
+  ULONG64 qtc_min_share = 40; { char s[16]; DWORD n=GetEnvironmentVariableA("DBVM_QTC_MIN_SHARE", s, sizeof(s)); if (n>0){ unsigned v=atoi(s); if (v<=100) qtc_min_share=v; }}
+  HANDLE th = GetCurrentThread();
+  for (unsigned i=0, attempts=0;i<iters && attempts<iters*4; attempts++) {
+    ULONG64 q0=0,q1=0; QueryThreadCycleTime(th, &q0); unsigned long long t0 = rdtsc64();
     __try {
       fn();
     } __except(EXCEPTION_EXECUTE_HANDLER) {
       // expected
     }
-    unsigned long long t1 = rdtsc64();
+    unsigned long long t1 = rdtsc64(); QueryThreadCycleTime(th, &q1);
     uint64_t dt = (t1 - t0);
+    uint64_t dqc = (uint64_t)(q1 - q0);
+    if (dqc * 100ULL < dt * qtc_min_share) { continue; }
     total += dt; ok++;
     if (dt < vmin) vmin = dt;
     if (dt > vmax) vmax = dt;
     if (sc<1024) samples[sc++]=dt;
+    i++;
   }
   if (out) {
     for (unsigned i=1;i<sc;i++){ uint64_t key=samples[i]; int j=(int)i-1; while (j>=0 && samples[j]>key){ samples[j+1]=samples[j]; j--; } samples[j+1]=key; }
@@ -507,21 +520,27 @@ static void measure_pairwise_delta(BOOL amd_vmmcall, timing_stats_t* out)
     __try { (void)call_stub_nocf(fn_vm, &data_w, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
     __try { fn_ud(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
   }
-  for (unsigned i=0;i<iters;i++) {
+  ULONG64 qtc_min_share = 40; { char s[16]; DWORD n=GetEnvironmentVariableA("DBVM_QTC_MIN_SHARE", s, sizeof(s)); if (n>0){ unsigned v=atoi(s); if (v<=100) qtc_min_share=v; }}
+  HANDLE th = GetCurrentThread();
+  for (unsigned i=0, attempts=0;i<iters && attempts<iters*4; attempts++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     // VM*CALL timing
-    uint64_t t0 = rdtsc64();
+    ULONG64 q0=0,q1=0; QueryThreadCycleTime(th, &q0); uint64_t t0 = rdtsc64();
     __try { (void)call_stub_nocf(fn_vm, &data, 0x11111111ULL, 0x22222222ULL); }
     __except(EXCEPTION_EXECUTE_HANDLER) {}
-    uint64_t t1 = rdtsc64();
+    uint64_t t1 = rdtsc64(); QueryThreadCycleTime(th, &q1);
     uint64_t vm_dt = t1 - t0;
+    uint64_t vm_qc = (uint64_t)(q1 - q0);
     // UD2 timing
-    t0 = rdtsc64();
+    QueryThreadCycleTime(th, &q0); t0 = rdtsc64();
     __try { fn_ud(); } __except(EXCEPTION_EXECUTE_HANDLER) {}
-    t1 = rdtsc64();
+    t1 = rdtsc64(); QueryThreadCycleTime(th, &q1);
     uint64_t ud_dt = t1 - t0;
+    uint64_t ud_qc = (uint64_t)(q1 - q0);
+    if ( (vm_qc * 100ULL < vm_dt * qtc_min_share) || (ud_qc * 100ULL < ud_dt * qtc_min_share) ) { continue; }
     int64_t delta = (int64_t)vm_dt - (int64_t)ud_dt;
     if (sc<1024) samples[sc++] = (delta<0)?0:(uint64_t)delta; // clamp negatives to 0
+    i++;
   }
   if (out) {
     // sort

@@ -25,25 +25,23 @@ This document describes a robust, password‑free method to detect Cheat Engine�
   - If detected → DBVM_CONFIRMED with reason.
 
 ## Stable Timing Side‑Channel (Password‑Free)
-The side‑channel compares the cost of the injected‑#UD path for VM*CALL/VMMCALL vs UD2.
+The side‑channel compares the cost of the injected‑#UD path for VM*CALL/VMMCALL vs UD2. Policy is now pairwise‑only.
 
 Implementation details that reduce variance:
 - Affinity: Pin the measuring thread to a single CPU.
 - Priority: Set thread priority to TIME_CRITICAL and disable priority boost during the window.
 - Serialization: Wrap RDTSC with LFENCE before and after to reduce out‑of‑order skew.
 - Sample count: 512 iterations/path by default (override with DBVM_MEASURE_ITERS, allowed 64–4096).
-- Outlier control: Sort samples and compute a 5% trimmed summary (trim 5% each tail) for mean/min/max and p50/p90/p99. This kills ISR/DPC spikes that previously exploded p90/p99.
+- Outlier control: Sort accepted samples and compute a 5% trimmed summary (trim 5% each tail) for mean/min/max and p50/p90/p99. This kills ISR/DPC spikes that previously exploded p90/p99.
+- Preemption gating (QueryThreadCycleTime): For each iteration, compute thread_cycles vs rdtsc_cycles; drop the sample when `thread_cycles * 100 < rdtsc_cycles * qtc_min_share` (default 40%). Continue until N accepted samples are collected (retry attempts up to N×4).
+- Warm‑up & lock: 32 warm‑up iterations per path before timing; code stubs are `VirtualLock`’d to remove demand page faults.
 - AMD path selection: We measure both VMCALL and VMMCALL; the slower path is reported as vmcall_*.
 
-Suggested thresholds (timing only):
-- SUSPECT when BOTH:
-  - vmcall_p50 >= ud2_p50 × 1.40 AND vmcall_p90 >= ud2_p90 × 1.40.
-- Optional uplift to CONFIRMED when mean ratio is very high:
-  - vmcall_mean / ud2_mean >= 1.60 (use only if PF‑first is unavailable on that box).
-
-Optional stricter mode (pairwise deltas):
-- Interleave per‑iteration and compute delta = vmcall_dt − ud2_dt. Use the distribution of deltas to cancel shared OS noise.
-- Decision example: median(delta) ≥ +1800 cycles AND p90(delta) ≥ +2300 cycles (tune per host).
+Pairwise‑only thresholds (timing policy):
+- Interleave per‑iteration and compute delta = vmcall_dt − ud2_dt.
+- Decision: `delta_p50 >= 1800` cycles AND `delta_p90 >= 2300` cycles (tune per host). Env overrides: `DBVM_DELTA_P50_MIN`, `DBVM_DELTA_P90_MIN`.
+  - On bare metal (no DBVM), deltas are near zero (e.g., p50≈36, p90≈108 in your logs) → will not trigger.
+  - With DBVM loaded, deltas are thousands of cycles → triggers cleanly.
 
 ## Decision Ladder (Password‑Free)
 1) PF‑first on VM*CALL?
@@ -52,8 +50,8 @@ Optional stricter mode (pairwise deltas):
    - Yes → DBVM_CONFIRMED (reason: IDTR=2048 & GDTR=88).
 3) RIP‑advance on #UD?
    - Yes → DBVM_CONFIRMED.
-4) Timing side‑channel (trimmed) meets p50/p90 ≥ +40%?
-   - Yes → DBVM_SUSPECT. If (optional) mean ratio ≥ 1.60 → DBVM_CONFIRMED.
+4) Timing side‑channel (pairwise only) meets delta thresholds?
+   - Yes → DBVM_SUSPECT.
 5) If CPUID hypervisor bit set but no DBVM signature → OTHER_HYPERVISOR.
 6) Else → NO_HYPERVISOR.
 
@@ -211,4 +209,3 @@ vm_ud_vmmcall_cycles=7784
 - PF‑first confirm is independent of timing and passwords and is the most reliable primary signal on your hardware.
 - Timing is now measured with serialization, CPU pinning, priority control, and trimmed summaries to keep percentiles stable between runs.
 - Descriptor and RIP‑advance confirms are opportunistic; if absent, timing+PF‑first still suffice.
-
