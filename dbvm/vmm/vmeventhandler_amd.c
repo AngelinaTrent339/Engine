@@ -1522,22 +1522,13 @@ if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
 
     case VMEXIT_VMMCALL:
     {
-      // dbvm callback for amd
-      nosendchar[getAPICID()]=0;
-      // If CPL=3 and passwords are invalid, inject #UD immediately (prevents any PF-first ordering)
+      // Fast-path: invalid credentials -> immediate #UD inject with minimal overhead
+      if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
       {
-        int cpl = currentcpuinfo->vmcb->CPL; // reliable CPL on AMD
-        if (cpl == 3)
-        {
-          if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
-          {
-            // Clear any pending reinjection info and force #UD
-            currentcpuinfo->vmcb->EVENTINJ = 0;
-            currentcpuinfo->vmcb->EXITINTINFO = 0;
-            raiseInvalidOpcodeException(currentcpuinfo);
-            return 0;
-          }
-        }
+        currentcpuinfo->vmcb->EVENTINJ = 0;
+        currentcpuinfo->vmcb->EXITINTINFO = 0;
+        raiseInvalidOpcodeException(currentcpuinfo);
+        return 0;
       }
       return handleVMCall(currentcpuinfo, vmregisters);
     }

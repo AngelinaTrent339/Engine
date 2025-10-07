@@ -290,19 +290,12 @@ int raiseInvalidOpcodeException(pcpuinfo currentcpuinfo)
   }
   else
   {
-    VMEntry_interruption_information newintinfo;
-
-    newintinfo.interruption_information=0;
-    newintinfo.interruptvector=6;
-    newintinfo.type=3; //hardware
-    newintinfo.haserrorcode=0; //no errorcode
-    newintinfo.valid=1;
-
-    vmwrite(vm_entry_interruptioninfo, (ULONG)newintinfo.interruption_information); //entry info field
-    vmwrite(0x4018, 0); //entry errorcode
-    // For #UD injection, do not advance guest RIP. Ensure VM-entry instruction length is 0.
-    // Using the VM-exit instruction length here caused RIP-advance anomalies detectable by AC.
-    vmwrite(0x401a, 0); //entry instruction length
+    // Precomputed #UD injection info: valid=1, type=3 (hardware exception), vector=6, no errorcode
+    static const ULONG ud_inject_info = (1u<<31) | (3u<<8) | 6u;
+    vmwrite(vm_entry_interruptioninfo, ud_inject_info);
+    // Ensure no RIP advance on entry
+    vmwrite(0x401a, 0); // VM-entry instruction length = 0
+    // Note: errorcode is ignored for haserrorcode=0, avoid extra vmwrite
   }
 
   return 0;

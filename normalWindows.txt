@@ -1,0 +1,886 @@
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4908
+ud2_ud_cycles=4892
+vmcall_ud_min=4860 vmcall_ud_max=5004
+vmcall_p50=4896 vmcall_p90=4968 vmcall_p99=5004
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=51
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=516
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=4908
+vm_ud_vmmcall_cycles=4892
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5819
+ud2_ud_cycles=4873
+vmcall_ud_min=4860 vmcall_ud_max=9864
+vmcall_p50=4932 vmcall_p90=8604 vmcall_p99=9792
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=63
+delta_min=0 delta_max=144
+delta_p50=72 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=684
+vm_ud_vmcall_cycles=5819
+vm_ud_vmmcall_cycles=4898
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5840
+ud2_ud_cycles=5324
+vmcall_ud_min=4896 vmcall_ud_max=6192
+vmcall_p50=6084 vmcall_p90=6156 vmcall_p99=6192
+ud2_ud_min=4860 ud2_ud_max=8712
+ud2_p50=4932 ud2_p90=7560 ud2_p99=8640
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=31
+delta_min=0 delta_max=108
+delta_p50=36 delta_p90=72 delta_p99=108
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=684
+vm_ud_vmcall_cycles=5840
+vm_ud_vmmcall_cycles=4911
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4917
+ud2_ud_cycles=4865
+vmcall_ud_min=4860 vmcall_ud_max=5004
+vmcall_p50=4932 vmcall_p90=4968 vmcall_p99=5004
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=52
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=4917
+vm_ud_vmmcall_cycles=4909
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5267
+ud2_ud_cycles=4962
+vmcall_ud_min=4896 vmcall_ud_max=8748
+vmcall_p50=4932 vmcall_p90=7236 vmcall_p99=8568
+ud2_ud_min=4860 ud2_ud_max=7812
+ud2_p50=4932 ud2_p90=5004 ud2_p99=5256
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=54
+delta_min=0 delta_max=180
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=521
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4939
+vm_ud_vmmcall_cycles=5267
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=6017
+ud2_ud_cycles=4905
+vmcall_ud_min=4932 vmcall_ud_max=6192
+vmcall_p50=6120 vmcall_p90=6156 vmcall_p99=6192
+ud2_ud_min=4860 ud2_ud_max=5004
+ud2_p50=4896 ud2_p90=4932 ud2_p99=5004
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=52
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=520
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=6017
+vm_ud_vmmcall_cycles=4924
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4913
+ud2_ud_cycles=4864
+vmcall_ud_min=4860 vmcall_ud_max=5004
+vmcall_p50=4896 vmcall_p90=4968 vmcall_p99=5004
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=48
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=517
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=4913
+vm_ud_vmmcall_cycles=4897
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5254
+ud2_ud_cycles=4872
+vmcall_ud_min=4860 vmcall_ud_max=9000
+vmcall_p50=4932 vmcall_p90=6228 vmcall_p99=8784
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=44
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=684
+vm_ud_vmcall_cycles=5254
+vm_ud_vmmcall_cycles=4913
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5114
+ud2_ud_cycles=4893
+vmcall_ud_min=4860 vmcall_ud_max=8568
+vmcall_p50=4932 vmcall_p90=5040 vmcall_p99=8388
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=36
+delta_min=0 delta_max=108
+delta_p50=36 delta_p90=108 delta_p99=108
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=576
+vm_ud_vmcall_cycles=5114
+vm_ud_vmmcall_cycles=4924
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=6045
+ud2_ud_cycles=4869
+vmcall_ud_min=4932 vmcall_ud_max=6228
+vmcall_p50=6120 vmcall_p90=6192 vmcall_p99=6228
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=53
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=6045
+vm_ud_vmmcall_cycles=4902
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release>
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exedbvm_detect_cli.exe
+dbvm_detect_cli.exedbvm_detect_cli.exe : The term 'dbvm_detect_cli.exedbvm_detect_cli.exe' is not recognized as the
+name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ dbvm_detect_cli.exedbvm_detect_cli.exe
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (dbvm_detect_cli.exedbvm_detect_cli.exe:String) [], CommandNotFoundExcep
+   tion
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5781
+ud2_ud_cycles=4895
+vmcall_ud_min=4896 vmcall_ud_max=6192
+vmcall_p50=6084 vmcall_p90=6156 vmcall_p99=6192
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=46
+delta_min=0 delta_max=288
+delta_p50=36 delta_p90=108 delta_p99=216
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=535
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=5781
+vm_ud_vmmcall_cycles=4937
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4914
+ud2_ud_cycles=4886
+vmcall_ud_min=4860 vmcall_ud_max=5004
+vmcall_p50=4896 vmcall_p90=4968 vmcall_p99=5004
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=49
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4914
+vm_ud_vmmcall_cycles=4900
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4939
+ud2_ud_cycles=4892
+vmcall_ud_min=4896 vmcall_ud_max=5040
+vmcall_p50=4932 vmcall_p90=5004 vmcall_p99=5040
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=46
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=517
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4939
+vm_ud_vmmcall_cycles=4913
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4908
+ud2_ud_cycles=4868
+vmcall_ud_min=4860 vmcall_ud_max=4968
+vmcall_p50=4896 vmcall_p90=4968 vmcall_p99=4968
+ud2_ud_min=4824 ud2_ud_max=4932
+ud2_p50=4860 ud2_p90=4896 ud2_p99=4932
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=65
+delta_min=0 delta_max=216
+delta_p50=72 delta_p90=144 delta_p99=180
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=519
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=4888
+vm_ud_vmmcall_cycles=4908
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5097
+ud2_ud_cycles=5037
+vmcall_ud_min=4860 vmcall_ud_max=7956
+vmcall_p50=4932 vmcall_p90=5040 vmcall_p99=7848
+ud2_ud_min=4824 ud2_ud_max=8424
+ud2_p50=4896 ud2_p90=5004 ud2_p99=8280
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=47
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=612
+vm_ud_vmcall_cycles=4930
+vm_ud_vmmcall_cycles=5097
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4904
+ud2_ud_cycles=4888
+vmcall_ud_min=4860 vmcall_ud_max=4968
+vmcall_p50=4896 vmcall_p90=4932 vmcall_p99=4968
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=58
+delta_min=0 delta_max=180
+delta_p50=72 delta_p90=108 delta_p99=180
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4904
+vm_ud_vmmcall_cycles=4890
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=5168
+ud2_ud_cycles=4907
+vmcall_ud_min=4860 vmcall_ud_max=8748
+vmcall_p50=4932 vmcall_p90=5076 vmcall_p99=8568
+ud2_ud_min=4824 ud2_ud_max=5004
+ud2_p50=4896 ud2_p90=4968 ud2_p99=5004
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=47
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=518
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=5105
+vm_ud_vmmcall_cycles=5168
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4881
+ud2_ud_cycles=5252
+vmcall_ud_min=4824 vmcall_ud_max=4968
+vmcall_p50=4896 vmcall_p90=4932 vmcall_p99=4968
+ud2_ud_min=4824 ud2_ud_max=8784
+ud2_p50=4896 ud2_p90=7236 ud2_p99=8568
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=43
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=517
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4881
+vm_ud_vmmcall_cycles=4866
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=NO_HYPERVISOR
+reason=No DBVM indicators detected
+hv_present_bit=0
+vmcall_ud_cycles=4918
+ud2_ud_cycles=4886
+vmcall_ud_min=4860 vmcall_ud_max=5004
+vmcall_p50=4932 vmcall_p90=4968 vmcall_p99=5004
+ud2_ud_min=4824 ud2_ud_max=4968
+ud2_p50=4896 ud2_p90=4932 ud2_p99=4968
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=50
+delta_min=0 delta_max=144
+delta_p50=36 delta_p90=108 delta_p99=144
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC000001D tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC000001D tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC000001D tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC000001D tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM+ DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=520
+syscall_min=504
+syscall_max=648
+vm_ud_vmcall_cycles=4918
+vm_ud_vmmcall_cycles=4912

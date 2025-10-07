@@ -4429,18 +4429,11 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
 
     case 18: //VMCALL
     {
-      nosendchar[getAPICID()]=0;
-      // If CPL=3 and passwords are invalid, inject #UD immediately (prevents any PF-first ordering)
+      // Fast-path: invalid credentials -> immediate #UD inject with minimal overhead
+      if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
       {
-        int cpl = vmread(vm_guest_cs) & 3;
-        if (cpl == 3)
-        {
-          if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
-          {
-            raiseInvalidOpcodeException(currentcpuinfo);
-            return 0;
-          }
-        }
+        raiseInvalidOpcodeException(currentcpuinfo);
+        return 0;
       }
 
       result = handleVMCall(currentcpuinfo, vmregisters);

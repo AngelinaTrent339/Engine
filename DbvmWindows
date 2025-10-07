@@ -1,0 +1,1056 @@
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7285
+ud2_ud_cycles=5008
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4932 ud2_ud_max=5076
+ud2_p50=5004 ud2_p90=5040 ud2_p99=5076
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2278
+delta_min=2160 delta_max=2412
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=633
+syscall_min=540
+syscall_max=1656
+vm_ud_vmcall_cycles=5415
+vm_ud_vmmcall_cycles=7285
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7294
+ud2_ud_cycles=5040
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7308 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5148
+ud2_p50=5040 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2277
+delta_min=2196 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=567
+syscall_min=540
+syscall_max=1332
+vm_ud_vmcall_cycles=5062
+vm_ud_vmmcall_cycles=7294
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7297
+ud2_ud_cycles=5039
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7308 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5040 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2346
+delta_min=2160 delta_max=4104
+delta_p50=2304 delta_p90=2412 delta_p99=3708
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=564
+syscall_min=540
+syscall_max=1296
+vm_ud_vmcall_cycles=6147
+vm_ud_vmmcall_cycles=7297
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7363
+ud2_ud_cycles=5031
+vmcall_ud_min=7272 vmcall_ud_max=7488
+vmcall_p50=7380 vmcall_p90=7452 vmcall_p99=7488
+ud2_ud_min=4968 ud2_ud_max=5148
+ud2_p50=5040 ud2_p90=5112 ud2_p99=5148
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2304
+delta_min=2124 delta_max=2484
+delta_p50=2304 delta_p90=2412 delta_p99=2484
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=561
+syscall_min=540
+syscall_max=1188
+vm_ud_vmcall_cycles=5082
+vm_ud_vmmcall_cycles=7363
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7305
+ud2_ud_cycles=5022
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7308 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2256
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=563
+syscall_min=540
+syscall_max=1296
+vm_ud_vmcall_cycles=5070
+vm_ud_vmmcall_cycles=7305
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7313
+ud2_ud_cycles=5051
+vmcall_ud_min=7272 vmcall_ud_max=7488
+vmcall_p50=7308 vmcall_p90=7380 vmcall_p99=7452
+ud2_ud_min=5004 ud2_ud_max=5112
+ud2_p50=5040 ud2_p90=5112 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2288
+delta_min=2160 delta_max=2412
+delta_p50=2304 delta_p90=2340 delta_p99=2412
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=566
+syscall_min=540
+syscall_max=1260
+vm_ud_vmcall_cycles=5955
+vm_ud_vmmcall_cycles=7313
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7283
+ud2_ud_cycles=5016
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2312
+delta_min=2160 delta_max=3672
+delta_p50=2268 delta_p90=2376 delta_p99=3528
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=572
+syscall_min=540
+syscall_max=2160
+vm_ud_vmcall_cycles=5048
+vm_ud_vmmcall_cycles=7283
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7493
+ud2_ud_cycles=5024
+vmcall_ud_min=7236 vmcall_ud_max=11772
+vmcall_p50=7308 vmcall_p90=7380 vmcall_p99=11448
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2266
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=562
+syscall_min=540
+syscall_max=1224
+vm_ud_vmcall_cycles=5428
+vm_ud_vmmcall_cycles=7493
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7273
+ud2_ud_cycles=4996
+vmcall_ud_min=7236 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7308 vmcall_p99=7344
+ud2_ud_min=4932 ud2_ud_max=5076
+ud2_p50=5004 ud2_p90=5040 ud2_p99=5076
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2257
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=560
+syscall_min=540
+syscall_max=1476
+vm_ud_vmcall_cycles=5054
+vm_ud_vmmcall_cycles=7273
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7288
+ud2_ud_cycles=5001
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4932 ud2_ud_max=5076
+ud2_p50=5004 ud2_p90=5040 ud2_p99=5076
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2247
+delta_min=2160 delta_max=2376
+delta_p50=2232 delta_p90=2304 delta_p99=2340
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=567
+syscall_min=540
+syscall_max=1188
+vm_ud_vmcall_cycles=5035
+vm_ud_vmmcall_cycles=7288
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exedbvm_detect_cli.exe
+dbvm_detect_cli.exedbvm_detect_cli.exe : The term 'dbvm_detect_cli.exedbvm_detect_cli.exe' is not recognized as the
+name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ dbvm_detect_cli.exedbvm_detect_cli.exe
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (dbvm_detect_cli.exedbvm_detect_cli.exe:String) [], CommandNotFoundExcep
+   tion
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release>
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7631
+ud2_ud_cycles=5185
+vmcall_ud_min=7236 vmcall_ud_max=12312
+vmcall_p50=7272 vmcall_p90=7452 vmcall_p99=12204
+ud2_ud_min=4968 ud2_ud_max=8280
+ud2_p50=5040 ud2_p90=5148 ud2_p99=8136
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2270
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=562
+syscall_min=540
+syscall_max=1296
+vm_ud_vmcall_cycles=5734
+vm_ud_vmmcall_cycles=7631
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exedbvm_detect_cli.exe
+dbvm_detect_cli.exedbvm_detect_cli.exe : The term 'dbvm_detect_cli.exedbvm_detect_cli.exe' is not recognized as the
+name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was
+included, verify that the path is correct and try again.
+At line:1 char:1
++ dbvm_detect_cli.exedbvm_detect_cli.exe
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (dbvm_detect_cli.exedbvm_detect_cli.exe:String) [], CommandNotFoundExcep
+   tion
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7263
+ud2_ud_cycles=5008
+vmcall_ud_min=7200 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7308 vmcall_p99=7344
+ud2_ud_min=4932 ud2_ud_max=5076
+ud2_p50=5004 ud2_p90=5040 ud2_p99=5076
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2212
+delta_min=2124 delta_max=2304
+delta_p50=2196 delta_p90=2268 delta_p99=2304
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=561
+syscall_min=540
+syscall_max=1368
+vm_ud_vmcall_cycles=5053
+vm_ud_vmmcall_cycles=7263
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7279
+ud2_ud_cycles=5023
+vmcall_ud_min=7236 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=5148
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2283
+delta_min=2160 delta_max=2412
+delta_p50=2268 delta_p90=2340 delta_p99=2412
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=572
+syscall_min=540
+syscall_max=1260
+vm_ud_vmcall_cycles=5061
+vm_ud_vmmcall_cycles=7279
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7291
+ud2_ud_cycles=5027
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5040 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2255
+delta_min=2160 delta_max=2340
+delta_p50=2268 delta_p90=2304 delta_p99=2340
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=587
+syscall_min=576
+syscall_max=1260
+vm_ud_vmcall_cycles=5054
+vm_ud_vmmcall_cycles=7291
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7470
+ud2_ud_cycles=5219
+vmcall_ud_min=7380 vmcall_ud_max=7560
+vmcall_p50=7452 vmcall_p90=7524 vmcall_p99=7560
+ud2_ud_min=5148 ud2_ud_max=5328
+ud2_p50=5220 ud2_p90=5292 ud2_p99=5328
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2271
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=562
+syscall_min=540
+syscall_max=1332
+vm_ud_vmcall_cycles=5219
+vm_ud_vmmcall_cycles=7470
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7285
+ud2_ud_cycles=5044
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5148
+ud2_p50=5040 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2272
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=565
+syscall_min=540
+syscall_max=1368
+vm_ud_vmcall_cycles=5302
+vm_ud_vmmcall_cycles=7285
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7277
+ud2_ud_cycles=5022
+vmcall_ud_min=7236 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7308 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2283
+delta_min=2196 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=561
+syscall_min=540
+syscall_max=1332
+vm_ud_vmcall_cycles=5060
+vm_ud_vmmcall_cycles=7277
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7291
+ud2_ud_cycles=5795
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=9036
+ud2_p50=5076 ud2_p90=8208 ud2_p99=8964
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2299
+delta_min=2196 delta_max=2412
+delta_p50=2304 delta_p90=2376 delta_p99=2412
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010306
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010306
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010306
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010306
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=563
+syscall_min=540
+syscall_max=1296
+vm_ud_vmcall_cycles=5075
+vm_ud_vmmcall_cycles=7291
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7312
+ud2_ud_cycles=5052
+vmcall_ud_min=7272 vmcall_ud_max=7416
+vmcall_p50=7308 vmcall_p90=7380 vmcall_p99=7416
+ud2_ud_min=5004 ud2_ud_max=5148
+ud2_p50=5040 ud2_p90=5112 ud2_p99=5148
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2275
+delta_min=2160 delta_max=2412
+delta_p50=2268 delta_p90=2340 delta_p99=2412
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=569
+syscall_min=540
+syscall_max=2376
+vm_ud_vmcall_cycles=5090
+vm_ud_vmmcall_cycles=7312
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7276
+ud2_ud_cycles=5046
+vmcall_ud_min=7236 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7308 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=7308
+ud2_p50=5040 ud2_p90=5112 ud2_p99=5220
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2328
+delta_min=2160 delta_max=3708
+delta_p50=2304 delta_p90=2376 delta_p99=3600
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=563
+syscall_min=540
+syscall_max=1260
+vm_ud_vmcall_cycles=5674
+vm_ud_vmmcall_cycles=7276
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7288
+ud2_ud_cycles=5020
+vmcall_ud_min=7236 vmcall_ud_max=7380
+vmcall_p50=7272 vmcall_p90=7344 vmcall_p99=7380
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5004 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2260
+delta_min=2160 delta_max=2376
+delta_p50=2268 delta_p90=2340 delta_p99=2376
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010306
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=564
+syscall_min=540
+syscall_max=1512
+vm_ud_vmcall_cycles=5059
+vm_ud_vmmcall_cycles=7288
+(base) PS C:\Users\FSOS\Documents\cheat-engine\dbvm\vmm\build\Release> dbvm_detect_cli.exe
+result=DBVM_CONFIRMED
+reason=VM*CALL first exception ACCESS_VIOLATION
+dbvm_version=0x000000
+hv_present_bit=0
+vmcall_ud_cycles=7268
+ud2_ud_cycles=5042
+vmcall_ud_min=7200 vmcall_ud_max=7344
+vmcall_p50=7272 vmcall_p90=7308 vmcall_p99=7344
+ud2_ud_min=4968 ud2_ud_max=5112
+ud2_p50=5040 ud2_p90=5076 ud2_p99=5112
+fault_semantics_vmcall_exc=0x00000000
+fault_semantics_vmmcall_exc=0x00000000
+cpuid_0d_ecx_low16=0x0988
+xcr0_low32=0x00000007
+used_vmmcall=0
+idtr_limit=0x0FFF
+gdtr_limit=0x007F
+idtr_base=0xFFFFF80000001000
+gdtr_base=0xFFFFF8534B590000
+vmcall_rip_advance=0
+vmmcall_rip_advance=0
+pref_vmcall_rip_advance=0
+pref_vmmcall_rip_advance=0
+delta_mean=2322
+delta_min=2124 delta_max=3852
+delta_p50=2268 delta_p90=2376 delta_p99=3636
+vmcall_first_exc=0xC000001D vmcall_first_eflags=0x00010302
+ud2_first_exc=0xC000001D ud2_first_eflags=0x00010246
+rf_delta_signal=0
+tf_exc_count=4
+tf_exc_0_code=0xC0000005 tf_exc_0_eflags=0x00010302
+tf_exc_1_code=0xC0000005 tf_exc_1_eflags=0x00010302
+tf_exc_2_code=0xC0000005 tf_exc_2_eflags=0x00010302
+tf_exc_3_code=0xC0000005 tf_exc_3_eflags=0x00010302
+signals=TF- TFpref- SVM- DESC-
+cpu_vendor=AuthenticAMD
+cpuid_80000001_ecx=0x75C237FF
+cpuid_8000000a_eax=0x00000001
+cpuid_8000000a_ebx=0x00008000
+cpuid_8000000a_ecx=0x00000000
+cpuid_8000000a_edx=0x101BBCFF
+syscall_mean=569
+syscall_min=540
+syscall_max=1332
+vm_ud_vmcall_cycles=5064
+vm_ud_vmmcall_cycles=7268
