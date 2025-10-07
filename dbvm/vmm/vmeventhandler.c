@@ -91,8 +91,8 @@ static void disarm_tsc_comp(int apicid, pcpuinfo cpu)
 
 static __inline QWORD choose_vmcall_target(QWORD now)
 {
-  // Target bare-metal delta window ~36-96 cycles with slight jitter
-  return 48ULL + ((now >> 4) & 0x1F); // 48..79
+  // Approximate DBVM overhead to subtract (in cycles). Use small jitter to avoid fingerprinting.
+  return 2200ULL + ((now >> 4) & 0x3F); // 2200..2259
 }
 
 void schedule_vmcall_tsc_comp(int apicid)
@@ -4170,12 +4170,9 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
       }
       else
       {
-        QWORD start = tsc_comp_start_tsc[apic];
-        QWORD desired = tsc_comp_cycles[apic] ? tsc_comp_cycles[apic] : 64;
-        QWORD actual = (realtime>start) ? (realtime-start) : 0;
-        if (actual>desired)
+        QWORD correction = tsc_comp_cycles[apic];
+        if (correction)
         {
-          QWORD correction = actual - desired;
           QWORD floor = (lTSC)? lTSC : t;
           QWORD t_adj = (t>correction) ? (t-correction) : (floor?floor: t);
           if (t_adj <= floor)
