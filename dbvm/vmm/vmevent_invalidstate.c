@@ -13,7 +13,7 @@ int fixInterruptabilityState(void)
   VMEntry_interruption_information entryinterrupt;
   guestrflags.value=vmread(vm_guest_rflags);
 
-  int handled=0;
+  //int handled=0;
 
 
   is=is & 0x1f; //remove reserved bits
