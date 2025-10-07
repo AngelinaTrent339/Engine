@@ -781,47 +781,49 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
     }
   }
 
-  // 1) Direct signature: VMCALL/VMMCALL GetVersion with known defaults (optional, can be skipped)
+  // 1) Direct signature (optional, password-based): only when explicitly enabled
   DWORD ex = 0;
   char no_vm_env[8]; DWORD no_vm = GetEnvironmentVariableA("DBVM_NO_VM", no_vm_env, sizeof(no_vm_env));
+  char allow_pw_env[8]; DWORD allow_pw = GetEnvironmentVariableA("DBVM_ALLOW_PASSWORD_PROBES", allow_pw_env, sizeof(allow_pw_env));
 
-  // Try Intel first (VMCALL)
-  unsigned long long rax = 0;
-  if (!no_vm) rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
-  if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
-    run_measurements(info, (int)no_vm);
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
-    info->used_vmmcall = 0;
-    snprintf(info->reason, sizeof(info->reason),
-             "VMCALL GetVersion RAX=0x%llX", rax);
-    return info->result;
-  }
-
-  // Try AMD (VMMCALL)
-  ex = 0;
-  if (!no_vm) rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
-  if (!no_vm && ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
-    run_measurements(info, (int)no_vm);
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
-    info->used_vmmcall = 1;
-    snprintf(info->reason, sizeof(info->reason),
-             "VMMCALL GetVersion RAX=0x%llX", rax);
-    return info->result;
-  }
-
-  // Try a small dictionary of common password2 variants
-  {
-    BOOL used_vmmcall = 0; uint32_t ver=0;
-    if (try_common_passwords(&used_vmmcall, &ver)) {
+  if (!no_vm && allow_pw) {
+    // Try Intel first (VMCALL)
+    unsigned long long rax = try_vmcall_getversion(FALSE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+    if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
       run_measurements(info, (int)no_vm);
       info->result = DBVM_DETECT_DBVM_CONFIRMED;
-      info->dbvm_version = ver;
-      info->used_vmmcall = used_vmmcall;
+      info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
+      info->used_vmmcall = 0;
       snprintf(info->reason, sizeof(info->reason),
-               "GetVersion dictionary hit (P2 variant)");
+               "VMCALL GetVersion RAX=0x%llX", rax);
       return info->result;
+    }
+
+    // Try AMD (VMMCALL)
+    ex = 0;
+    rax = try_vmcall_getversion(TRUE, DBVM_P1, DBVM_P3, DBVM_P2, &ex);
+    if (ex == 0 && ((rax & 0xFF000000ULL) == 0xCE000000ULL)) {
+      run_measurements(info, (int)no_vm);
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      info->dbvm_version = (uint32_t)(rax & 0x00FFFFFFULL);
+      info->used_vmmcall = 1;
+      snprintf(info->reason, sizeof(info->reason),
+               "VMMCALL GetVersion RAX=0x%llX", rax);
+      return info->result;
+    }
+
+    // Try a small dictionary of common password2 variants (lab only)
+    {
+      BOOL used_vmmcall = 0; uint32_t ver=0;
+      if (try_common_passwords(&used_vmmcall, &ver)) {
+        run_measurements(info, (int)no_vm);
+        info->result = DBVM_DETECT_DBVM_CONFIRMED;
+        info->dbvm_version = ver;
+        info->used_vmmcall = used_vmmcall;
+        snprintf(info->reason, sizeof(info->reason),
+                 "GetVersion dictionary hit (P2 variant)");
+        return info->result;
+      }
     }
   }
 
@@ -851,9 +853,9 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // 1.b.2) Prefixed variant probes reserved for future hardening
 
-  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (default DISABLED; enable with DBVM_ENABLE_FAULT_SEM=1)
-  //      ACCESS_VIOLATION here strongly implicates a mediator mapping the pointer. Note: relies on default P1/P3.
-  if (!no_vm) {
+  // 1.c) Fault-semantics check with NOACCESS vmcall struct pointer (password-based; explicitly gated)
+  //      ACCESS_VIOLATION here strongly implicates a mediator mapping the pointer.
+  if (!no_vm && allow_pw) {
     char enfs[8]; DWORD enfs_dw = GetEnvironmentVariableA("DBVM_ENABLE_FAULT_SEM", enfs, sizeof(enfs));
     if (enfs_dw>0 && enfs[0]=='1') {
       DWORD f_vm = probe_vmcall_fault_semantics(FALSE);
@@ -874,7 +876,20 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // Signals (password-free)
   int sig_tf_plain = tf_first_plain_crosscore(info);
+  // Password-free confirm: DBVM builds often deliver an ACCESS_VIOLATION (#PF) before #UD around VM*CALL
+  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
+    return info->result;
+  }
   int sig_tf_pref  = tf_first_prefixed_crosscore(info);
+  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
+    run_measurements(info, (int)no_vm);
+    info->result = DBVM_DETECT_DBVM_CONFIRMED;
+    snprintf(info->reason, sizeof(info->reason), "Prefixed VM*CALL first exception ACCESS_VIOLATION");
+    return info->result;
+  }
   int sig_svm      = svm_suite_probe(info);
   int sig_desc     = sgdt_sidt_gueststyle_confirm();
   info->sig_tf_plain    = (uint8_t)(sig_tf_plain?1:0);

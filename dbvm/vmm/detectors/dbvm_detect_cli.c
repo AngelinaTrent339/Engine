@@ -113,6 +113,8 @@ int main(int argc, char** argv)
   int policy_mode = 0;
   int policy_threshold = 60; // percent over UD2 mean
   int no_vm = 0;
+  int allow_pw = 0;
+  int enable_fault_sem = 0;
   for (int i=1;i<argc;i++) {
     if (_stricmp(argv[i], "--pause")==0) pause_after=1;
     else if (_stricmp(argv[i], "--json")==0) json=1;
@@ -122,9 +124,16 @@ int main(int argc, char** argv)
       if (v>=10 && v<=300) policy_threshold=v;
     }
     else if (_stricmp(argv[i], "--no-vm")==0) no_vm=1;
+    else if (_stricmp(argv[i], "--allow-password-probes")==0) allow_pw=1;
+    else if (_stricmp(argv[i], "--fault-sem")==0) enable_fault_sem=1;
   }
 
   if (no_vm) SetEnvironmentVariableA("DBVM_NO_VM", "1");
+  if (allow_pw) SetEnvironmentVariableA("DBVM_ALLOW_PASSWORD_PROBES", "1");
+  if (enable_fault_sem) {
+    SetEnvironmentVariableA("DBVM_ALLOW_PASSWORD_PROBES", "1");
+    SetEnvironmentVariableA("DBVM_ENABLE_FAULT_SEM", "1");
+  }
 
   dbvm_detect_info_t info;
   dbvm_detect_result_t r = dbvm_detect_run(&info);
