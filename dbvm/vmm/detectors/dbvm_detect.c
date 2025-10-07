@@ -135,6 +135,17 @@ static const unsigned long      DBVM_P2 = 0xFEDCBA98UL;          // struct field
 // We set: RAX=data_ptr, RDX=p1, RCX=p3 and execute the instruction.
 // Returns with RAX preserved from the hypercall handler.
 typedef unsigned long long (WINAPI *hv_call3_t)(void* data, unsigned long long pass1, unsigned long long pass3);
+#if defined(_MSC_VER)
+__declspec(guard(nocf)) static unsigned long long call_stub_nocf(hv_call3_t fp, void* data, unsigned long long p1, unsigned long long p3)
+{
+  return fp(data, p1, p3);
+}
+#else
+static unsigned long long call_stub_nocf(hv_call3_t fp, void* data, unsigned long long p1, unsigned long long p3)
+{
+  return fp(data, p1, p3);
+}
+#endif
 typedef LONG (NTAPI *NtYieldExecution_t)(VOID);
 typedef LONG (NTAPI *NtQuerySystemTime_t)(PLARGE_INTEGER);
 
@@ -174,7 +185,7 @@ static unsigned long long try_vmcall_getversion(BOOL amd_vmmcall, unsigned long 
 
   unsigned long long rax = 0;
   __try {
-    rax = fn(&data, p1, p3);
+    rax = call_stub_nocf(fn, &data, p1, p3);
   } __except(EXCEPTION_EXECUTE_HANDLER) {
     *ex_code = GetExceptionCode();
     rax = 0;
@@ -339,9 +350,9 @@ static void measure_ud_path_cycles_vmcall(BOOL amd_vmmcall, timing_stats_t* out)
   for (unsigned i=0;i<iters;i++) {
     vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
     unsigned long long t0 = rdtsc64();
-    __try {
-      (void)fn(&data, 0x11111111ULL, 0x22222222ULL);
-    } __except(EXCEPTION_EXECUTE_HANDLER) {
+  __try {
+      (void)call_stub_nocf(fn, &data, 0x11111111ULL, 0x22222222ULL);
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
       // expected: illegal instruction
     }
     unsigned long long t1 = rdtsc64();
@@ -464,7 +475,7 @@ static int detect_vmcall_rip_advance(BOOL amd_vmmcall, uint64_t* advance_bytes)
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
   // Simple SEH-based RIP-advance capture (legacy); keep for compatibility
   __try {
-    fn(&data, 0x11111111ULL, 0x22222222ULL);
+    call_stub_nocf(fn, &data, 0x11111111ULL, 0x22222222ULL);
   } __except(vmcall_seh_filter(GetExceptionInformation())) {}
 
   if (g_vmexc_state.exception_code != EXCEPTION_ILLEGAL_INSTRUCTION)
@@ -504,7 +515,7 @@ static int probe_one_insn_tf_first(unsigned char prefix_or_00, unsigned char b1,
 
   hv_call3_t fn = (hv_call3_t)mem;
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __try { call_stub_nocf(fn, &data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
   g_probe_ctx.active = 0;
 
   int ok = (g_probe_ctx.capture && g_probe_ctx.capture->tf_exc_count>=1 && g_probe_ctx.capture->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
@@ -539,7 +550,7 @@ static int probe_prefixed_tf_first(BOOL amd_vmmcall, unsigned char prefix, dbvm_
   if (amd_vmmcall) g_probe_ctx.rip_out = &out->pref_vmmcall_rip_advance; else g_probe_ctx.rip_out = &out->pref_vmcall_rip_advance;
   static PVOID veh = NULL; if (!veh) veh = AddVectoredExceptionHandler(1, (PVECTORED_EXCEPTION_HANDLER)vmcall_veh);
   vmcall_basic_t data = {12, 0xDEADBEEF, 0xFFFFFFFF};
-  __try { fn(&data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
+  __try { call_stub_nocf(fn, &data, 0x11111111ULL, 0x22222222ULL); } __except(EXCEPTION_EXECUTE_HANDLER) {}
   g_probe_ctx.active = 0; g_probe_ctx.rip_out = NULL;
   DWORD ok = (out->tf_exc_count>=1 && out->tf_exc_codes[0]==EXCEPTION_SINGLE_STEP);
   return ok ? 1 : 0;
@@ -876,19 +887,25 @@ dbvm_detect_result_t dbvm_detect_run(dbvm_detect_info_t* info)
 
   // Signals (password-free)
   int sig_tf_plain = tf_first_plain_crosscore(info);
-  // Password-free confirm: DBVM builds often deliver an ACCESS_VIOLATION (#PF) before #UD around VM*CALL
-  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
-    run_measurements(info, (int)no_vm);
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
-    return info->result;
+  // Confirm on #PF-first around VM*CALL by default. Allow disabling via DBVM_DISABLE_PF_CONFIRM=1.
+  {
+    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
+    if (!(dis>0 && pfdis[0]=='1') && info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
+      run_measurements(info, (int)no_vm);
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "VM*CALL first exception ACCESS_VIOLATION");
+      return info->result;
+    }
   }
   int sig_tf_pref  = tf_first_prefixed_crosscore(info);
-  if (info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
-    run_measurements(info, (int)no_vm);
-    info->result = DBVM_DETECT_DBVM_CONFIRMED;
-    snprintf(info->reason, sizeof(info->reason), "Prefixed VM*CALL first exception ACCESS_VIOLATION");
-    return info->result;
+  {
+    char pfdis[4]; DWORD dis = GetEnvironmentVariableA("DBVM_DISABLE_PF_CONFIRM", pfdis, sizeof(pfdis));
+    if (!(dis>0 && pfdis[0]=='1') && info->tf_exc_count>=1 && info->tf_exc_codes[0]==EXCEPTION_ACCESS_VIOLATION) {
+      run_measurements(info, (int)no_vm);
+      info->result = DBVM_DETECT_DBVM_CONFIRMED;
+      snprintf(info->reason, sizeof(info->reason), "Prefixed VM*CALL first exception ACCESS_VIOLATION");
+      return info->result;
+    }
   }
   int sig_svm      = svm_suite_probe(info);
   int sig_desc     = sgdt_sidt_gueststyle_confirm();
