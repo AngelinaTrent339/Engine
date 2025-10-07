@@ -2481,13 +2481,18 @@ int _handleVMCall(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
     vmregisters->rax=currentcpuinfo->vmcb->RAX; //fill it in, it may get used here
 
   {
-    // Prefixed VM*CALL/VMMCALL from ring3 must raise #UD first, just like bare metal.
-    int cpl = isAMD ? (currentcpuinfo->vmcb->cs_selector & 3) : (vmread(vm_guest_cs) & 3);
-    if (cpl == 3)
+    // On AMD: avoid any guest memory fetch before password validation; ring3 invalid
+    // credentials must inject #UD without touching guest memory to prevent PF-first.
+    // On Intel we keep existing behavior.
+    if (!isAMD)
     {
-      UINT32 vmcall_length = vmcall_fetch_length(currentcpuinfo);
-      if (vmcall_length != 3)
-        return raiseInvalidOpcodeException(currentcpuinfo);
+      int cpl = (vmread(vm_guest_cs) & 3);
+      if (cpl == 3)
+      {
+        UINT32 vmcall_length = vmcall_fetch_length(currentcpuinfo);
+        if (vmcall_length != 3)
+          return raiseInvalidOpcodeException(currentcpuinfo);
+      }
     }
   }
 

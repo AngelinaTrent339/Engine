@@ -131,23 +131,20 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
         // Quick register password check (no guest memory touch)
         if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
         {
-          // Confirm the instruction is VM*CALL (best-effort). If map fails, still proceed.
-          int error = 0; UINT64 pfaddr = 0; int is_vm_insn = 0;
-          unsigned char buf[15] = {0};
-          unsigned char *bytes = (unsigned char *)mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pfaddr);
-          if (bytes)
+          // Confirm the instruction is VM*CALL using VMCB-fetched bytes (avoid guest mapping)
+          int is_vm_insn = 0;
+          int fetched = currentcpuinfo->vmcb->NumberOfBytesFetched;
+          if (fetched > 0 && fetched <= 15)
           {
-            int start=0; while (start<12 && isPrefix(bytes[start])) start++;
-            if (start+2 < 15 && bytes[start]==0x0F && bytes[start+1]==0x01 &&
-                (bytes[start+2]==0xD9 || bytes[start+2]==0xC1))
+            unsigned char* gb = (unsigned char*)currentcpuinfo->vmcb->GuestInstructionBytes;
+            int start=0; while (start+2 < fetched && isPrefix(gb[start])) start++;
+            if (start+2 < fetched && gb[start]==0x0F && gb[start+1]==0x01 &&
+                (gb[start+2]==0xD9 || gb[start+2]==0xC1))
               is_vm_insn = 1;
-            unmapVMmemory(bytes, 15);
           }
-          else
-          {
-            // If mapping failed while we're here due to NPF on fetch, still treat as VM*CALL site.
-            if (exitcode == VMEXIT_NPF) is_vm_insn = 1;
-          }
+          // If bytes unavailable (e.g., NPF on fetch), still treat as VM*CALL site on VMMCALL exit
+          if (!is_vm_insn && exitcode == VMEXIT_VMMCALL)
+            is_vm_insn = 1;
 
           if (is_vm_insn)
           {
@@ -155,7 +152,6 @@ int handleVMEvent_amd(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FXSAVE6
             currentcpuinfo->vmcb->EVENTINJ = 0;
             currentcpuinfo->vmcb->EXITINTINFO = 0;
             raiseInvalidOpcodeException(currentcpuinfo);
-            // Ensure no cached state confusion
             currentcpuinfo->vmcb->VMCB_CLEAN_BITS &= ~(1<<0);
             return 0;
           }
@@ -504,23 +500,22 @@ if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
     {
       int isFault=0; //on amd it seems it ever ever set RF. isDebugFault(currentcpuinfo->vmcb->DR6, currentcpuinfo->vmcb->DR7);
 
-      // Special-case: TF-first probe on VM*CALL at CPL=3 with invalid passwords
-      // should not lead to PF-first. If next bytes encode VM*CALL/VMMCALL, inject #UD now.
+      // Special-case: TF-first at VM*CALL must not PF-first. If next bytes encode VM*CALL/VMMCALL, inject #UD.
       {
         int cpl = currentcpuinfo->vmcb->CPL;
         if (cpl == 3)
         {
           if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
           {
-            int error = 0; UINT64 pfaddr = 0; int is_vm_insn = 0;
-            unsigned char *bytes = (unsigned char *)mapVMmemory(currentcpuinfo, currentcpuinfo->vmcb->cs_base+currentcpuinfo->vmcb->RIP, 15, &error, &pfaddr);
-            if (bytes)
+            int is_vm_insn = 0;
+            int fetched = currentcpuinfo->vmcb->NumberOfBytesFetched;
+            if (fetched > 0 && fetched <= 15)
             {
-              int start=0; while (start<12 && isPrefix(bytes[start])) start++;
-              if (start+2 < 15 && bytes[start]==0x0F && bytes[start+1]==0x01 &&
-                  (bytes[start+2]==0xD9 || bytes[start+2]==0xC1))
+              unsigned char* gb = (unsigned char*)currentcpuinfo->vmcb->GuestInstructionBytes;
+              int start=0; while (start+2 < fetched && isPrefix(gb[start])) start++;
+              if (start+2 < fetched && gb[start]==0x0F && gb[start+1]==0x01 &&
+                  (gb[start+2]==0xD9 || gb[start+2]==0xC1))
                 is_vm_insn = 1;
-              unmapVMmemory(bytes, 15);
             }
             if (is_vm_insn)
             {
