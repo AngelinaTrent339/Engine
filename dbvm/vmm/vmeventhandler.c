@@ -75,7 +75,7 @@ void schedule_vmcall_tsc_comp(int apicid)
   QWORD now=_rdtsc();
   tsc_comp_cycles[apicid]=choose_vmcall_comp(now);
   // expire quickly: only the next RDTSC in the exception path should get this
-  tsc_comp_expires_tsc[apicid]=now+200000; // ~0.1-0.2ms @2GHz
+  tsc_comp_expires_tsc[apicid]=now+50000000; // ~25ms @2GHz to survive SEH/VEH overhead
   tsc_comp_armed[apicid]=1;
 
   // Arm an RDTSC intercept for a single shot
