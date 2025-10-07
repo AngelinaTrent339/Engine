@@ -98,6 +98,8 @@ extern int useSpeedhack;
 
 
 void speedhack_setspeed(double speed);
+// Schedule a TSC compensation to be applied on the next intercepted RDTSC/RDTSCP on this CPU
+void schedule_vmcall_tsc_comp(int apicid);
 
 void incrementRIP(int count);
 

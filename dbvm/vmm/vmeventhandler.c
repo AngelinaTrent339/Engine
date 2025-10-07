@@ -54,6 +54,29 @@ criticalSection TSCCS={.name="TSCCS", .debuglevel=2};
 
 int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters);
 
+//
+// VMCALL timing spoofing: compensate the next RDTSC/RDTSCP after an invalid VM*CALL
+// to match bare-metal deltas (typically ~36-108 cycles difference vs UD2).
+//
+static volatile QWORD tsc_comp_cycles[256];
+static volatile QWORD tsc_comp_expires_tsc[256];
+
+static __inline QWORD choose_vmcall_comp(QWORD now)
+{
+  // Target around 2.2-2.6k cycles (observed DBVM overhead minus bare‑metal)
+  // Narrow jitter to avoid negative deltas and stay within typical noise envelope
+  return 2100ULL + ((now >> 4) & 0xFF) * 2ULL; // 2100..2608
+}
+
+void schedule_vmcall_tsc_comp(int apicid)
+{
+  if (apicid<0 || apicid>=256) return;
+  QWORD now=_rdtsc();
+  tsc_comp_cycles[apicid]=choose_vmcall_comp(now);
+  // expire quickly: only the next RDTSC in the exception path should get this
+  tsc_comp_expires_tsc[apicid]=now+200000; // ~0.1-0.2ms @2GHz
+}
+
 
 void incrementRIP(int count)
 {
@@ -4091,6 +4114,25 @@ int handle_rdtsc(pcpuinfo currentcpuinfo, VMRegisters *vmregisters)
   else
     t=realtime; //speedhack disabled ATM globalTSC+s;
 
+  // Apply one-shot TSC compensation if scheduled (e.g., after invalid VM*CALL)
+  {
+    int apic=getAPICID();
+    if (apic>=0 && apic<256)
+    {
+      QWORD comp=tsc_comp_cycles[apic];
+      if (comp && (realtime<=tsc_comp_expires_tsc[apic]))
+      {
+        QWORD t_adj = (t>comp) ? (t-comp) : t;
+        // keep monotonic progression relative to the current floor
+        QWORD floor = (lTSC)? lTSC : t;
+        if (t_adj <= floor)
+          t_adj = floor + 36; // minimal forward progress to mimic normal deltas
+        t = t_adj;
+        tsc_comp_cycles[apic]=0; // one-shot
+      }
+    }
+  }
+
   if (lTSC==0)
     lTSC=t;
 
@@ -4429,9 +4471,10 @@ int handleVMEvent_internal(pcpuinfo currentcpuinfo, VMRegisters *vmregisters, FX
 
     case 18: //VMCALL
     {
-      // Fast-path: invalid credentials -> immediate #UD inject with minimal overhead
+      // Fast-path: invalid credentials -> immediate #UD inject and schedule timing compensation
       if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
       {
+        schedule_vmcall_tsc_comp(getAPICID());
         raiseInvalidOpcodeException(currentcpuinfo);
         return 0;
       }

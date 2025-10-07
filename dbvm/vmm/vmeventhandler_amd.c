@@ -1525,6 +1525,7 @@ if ((bytes[start]==0x0f) && (bytes[start+1]==0x05))
       // Fast-path: invalid credentials -> immediate #UD inject with minimal overhead
       if ((vmregisters->rdx != Password1) || (vmregisters->rcx != Password3))
       {
+        schedule_vmcall_tsc_comp(getAPICID());
         currentcpuinfo->vmcb->EVENTINJ = 0;
         currentcpuinfo->vmcb->EXITINTINFO = 0;
         raiseInvalidOpcodeException(currentcpuinfo);
